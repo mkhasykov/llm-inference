@@ -1,0 +1,26 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+
+# venv (uv-managed)
+.venv/
+
+# editors / OS
+.vscode/
+.idea/
+.DS_Store
+
+# local-only Claude config (project-level overrides, not for repo)
+.claude/settings.local.json
+
+# benchmark outputs — regeneratable, don't pollute history
+# (commit canonical runs manually with `git add -f results/<name>.jsonl` if needed)
+results/
+
+# personal notes — not for the repo
+TODO.md
+PLAN.md
