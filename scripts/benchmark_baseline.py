@@ -62,7 +62,7 @@ def build_prompt(tokenizer, user_text: str) -> str:
     )
 
 
-def run_one(model, tokenizer, prompt_text: str, max_new_tokens: int) -> dict:
+def run_one(model, tokenizer, prompt_text: str, max_new_tokens: int, use_cache: bool) -> dict:
     inputs = tokenizer(prompt_text, return_tensors="pt").to(model.device)
     prompt_tokens = int(inputs["input_ids"].shape[1])
 
@@ -78,6 +78,7 @@ def run_one(model, tokenizer, prompt_text: str, max_new_tokens: int) -> dict:
             **inputs,
             max_new_tokens=max_new_tokens,
             do_sample=False,
+            use_cache=use_cache,
             streamer=streamer,
             pad_token_id=tokenizer.eos_token_id,
         )
@@ -127,11 +128,12 @@ def run_one(model, tokenizer, prompt_text: str, max_new_tokens: int) -> dict:
     }
 
 
-def warmup(model, tokenizer, max_new_tokens: int) -> None:
+def warmup(model, tokenizer, max_new_tokens: int, use_cache: bool) -> None:
     """One discarded generation to amortize CUDA kernel compile/autotune.
 
     Without this, the first measured example absorbs all the one-time GPU
-    overhead and reports inflated TTFT.
+    overhead and reports inflated TTFT. Run with the same `use_cache` as the
+    measured loop so the kernel shapes encountered here match.
     """
     prompt_text = build_prompt(tokenizer, "Hello.")
     inputs = tokenizer(prompt_text, return_tensors="pt").to(model.device)
@@ -140,6 +142,7 @@ def warmup(model, tokenizer, max_new_tokens: int) -> None:
             **inputs,
             max_new_tokens=max_new_tokens,
             do_sample=False,
+            use_cache=use_cache,
             pad_token_id=tokenizer.eos_token_id,
         )
     torch.cuda.synchronize()
@@ -152,6 +155,11 @@ def parse_args():
     p.add_argument("--limit", type=int, default=5)
     p.add_argument("--max-new-tokens", type=int, default=256)
     p.add_argument("--out-dir", default="results", type=Path)
+    p.add_argument(
+        "--no-cache",
+        action="store_true",
+        help="disable KV-cache (use_cache=False); off by default, matching HF",
+    )
     return p.parse_args()
 
 
@@ -166,9 +174,12 @@ def main():
         print(f"dataset not found: {args.dataset}", file=sys.stderr)
         sys.exit(1)
 
+    use_cache = not args.no_cache
+    cache_tag = "cache" if use_cache else "nocache"
+
     args.out_dir.mkdir(parents=True, exist_ok=True)
     ts = dt.datetime.now(dt.timezone.utc).strftime("%Y%m%dT%H%M%SZ")
-    out_path = args.out_dir / f"baseline_{ts}.jsonl"
+    out_path = args.out_dir / f"baseline_{ts}_{cache_tag}.jsonl"
 
     print(f"loading model: {args.model}")
     tokenizer = AutoTokenizer.from_pretrained(args.model)
@@ -180,10 +191,10 @@ def main():
     model.eval()
     dtype = str(next(model.parameters()).dtype).replace("torch.", "")
     gpu_name = torch.cuda.get_device_name(0)
-    print(f"model loaded, dtype={dtype}, gpu={gpu_name}")
+    print(f"model loaded, dtype={dtype}, gpu={gpu_name}, use_cache={use_cache}")
 
     print("warmup...")
-    warmup(model, tokenizer, args.max_new_tokens)
+    warmup(model, tokenizer, args.max_new_tokens, use_cache)
 
     items = load_dataset(args.dataset, args.limit)
     print(f"running {len(items)} prompts → {out_path}")
@@ -191,6 +202,7 @@ def main():
     gen_settings = {
         "max_new_tokens": args.max_new_tokens,
         "do_sample": False,
+        "use_cache": use_cache,
         "dtype": dtype,
     }
 
@@ -199,7 +211,7 @@ def main():
         for item in items:
             user_text = item["turns"][0]
             prompt_text = build_prompt(tokenizer, user_text)
-            metrics = run_one(model, tokenizer, prompt_text, args.max_new_tokens)
+            metrics = run_one(model, tokenizer, prompt_text, args.max_new_tokens, use_cache)
 
             row = {
                 "model": args.model,
