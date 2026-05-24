@@ -15,6 +15,8 @@ import torch
 from transformers import AutoModelForCausalLM, AutoTokenizer
 from transformers.generation.streamers import BaseStreamer
 
+from summary import build_summary, print_summary
+
 
 class CudaEventStreamer(BaseStreamer):
     """Record a CUDA event for every token generate() emits.
@@ -235,19 +237,21 @@ def main():
                 f"vram={metrics['peak_vram_bytes'] / 1e9:.2f}GB"
             )
 
+    summary = build_summary(
+        rows,
+        run_id=out_path.stem,
+        kind="baseline",
+        model=args.model,
+        gpu=gpu_name,
+        gen_settings=gen_settings,
+    )
+    summary_path = out_path.with_suffix(".json")
+    with summary_path.open("w") as f:
+        json.dump(summary, f, indent=2)
+
     print("\n=== summary ===")
-    tps_values = [r["tokens_per_sec"] for r in rows if r["tokens_per_sec"]]
-    ttft_values = [r["ttft_ms"] for r in rows if r["ttft_ms"]]
-    vram_values = [r["peak_vram_bytes"] for r in rows]
-    if tps_values:
-        print(f"tokens/sec  mean={statistics.fmean(tps_values):.2f}  "
-              f"min={min(tps_values):.2f}  max={max(tps_values):.2f}")
-    if ttft_values:
-        print(f"ttft (ms)   mean={statistics.fmean(ttft_values):.2f}  "
-              f"min={min(ttft_values):.2f}  max={max(ttft_values):.2f}")
-    if vram_values:
-        print(f"peak VRAM   max={max(vram_values) / 1e9:.2f}GB")
-    print(f"results: {out_path}")
+    print_summary(summary)
+    print(f"results:  per-prompt={out_path}  summary={summary_path}")
 
 
 if __name__ == "__main__":
