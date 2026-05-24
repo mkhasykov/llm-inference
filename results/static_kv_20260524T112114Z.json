@@ -1,0 +1,33 @@
+{
+  "run_id": "static_kv_20260524T112114Z",
+  "kind": "static_kv",
+  "model": "Qwen/Qwen2.5-1.5B-Instruct",
+  "gpu": "NVIDIA GeForce RTX 3090",
+  "git_commit": "2270614",
+  "timestamp_utc": "2026-05-24T11:25:40.458358+00:00",
+  "n_prompts": 80,
+  "gen_settings": {
+    "max_new_tokens": 256,
+    "do_sample": false,
+    "use_cache": true,
+    "cache_class": "PreallocatedKVCache",
+    "dtype": "bfloat16"
+  },
+  "tokens_per_sec": {
+    "mean": 58.49,
+    "min": 38.056,
+    "max": 71.145
+  },
+  "ttft_ms": {
+    "mean": 18.623,
+    "min": 11.597,
+    "max": 62.779
+  },
+  "peak_vram_gb": {
+    "max": 3.234
+  },
+  "kv_cache_mb": {
+    "max": 18.38,
+    "mean": 10.12
+  }
+}
