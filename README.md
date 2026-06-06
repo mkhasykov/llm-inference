@@ -38,8 +38,15 @@ Key flags (all benchmark scripts):
 - `--model <hf-id>` — alternate model
 - `--limit <N>` — number of prompts (default 5; full set is 80)
 - `--max-new-tokens <N>` — generation length (default 256)
+- `--repeats <N>` — generations per prompt for run-to-run variance (default 1)
+- `--quality` — also compute WikiText-2 perplexity for this model/config
+  (`--quality-max-tokens <N>`, 0 = full test split)
 
 `benchmark_quant.py` additionally takes `--quant {int8,nf4,fp4}` (default `nf4`). It reuses the baseline generate path, so the only variable is the quantized weights.
+
+`--repeats` and `--quality` give the rigor needed to compare methods: timing
+metrics are reported as `mean ± std` (run-to-run jitter), and perplexity
+captures the quality cost of lossy methods (quantization is not free).
 
 Each run writes two files into `results/`:
 
@@ -84,12 +91,20 @@ Full summary JSON per run: [`results/`](results/).
 
 ```
 data/mt_bench/question.jsonl    # 80 MT-Bench prompts
-scripts/benchmark_baseline.py   # vanilla HF baseline
+src/llm_inference/              # shared harness (scripts are thin wrappers over this)
+  data.py                       #   dataset loading + chat-template prompt
+  modeling.py                   #   model/tokenizer loading, eos ids, dtype
+  timing.py                     #   CudaEventStreamer + begin/finish_measure (metrics)
+  decode.py                     #   explicit prefill+decode loop (manual-cache scripts)
+  caches.py                     #   PreallocatedKVCache (Cache subclass)
+  summary.py                    #   repeat aggregation + per-run summary (mean ± std)
+  quality.py                    #   WikiText-2 perplexity
+  cli.py                        #   shared CLI args, env checks, optional quality eval
+  runner.py                     #   per-prompt loop: repeats → aggregate → write
+scripts/benchmark_baseline.py   # vanilla HF generate (--no-cache for the floor)
 scripts/manual_kv_loop.py       # explicit prefill+decode with DynamicCache
 scripts/static_kv_loop.py       # same loop with our PreallocatedKVCache
-scripts/preallocated_kv_cache.py # Cache subclass: pre-allocated KV buffer
 scripts/benchmark_quant.py      # weight-quantized generate (bitsandbytes int8/nf4/fp4)
-scripts/summary.py              # shared summary builder (imported by the above)
 scripts/jsonl_to_summary.py     # regenerate summary from per-prompt JSONL
 results/                        # per-run summary JSON (per-prompt JSONL gitignored)
 ```
