@@ -22,6 +22,7 @@ TIMING_KEYS = (
     "ms_per_token_mean",
     "ms_per_token_p50",
     "ms_per_token_p95",
+    "ms_per_step_mean",  # speculative decoding only
 )
 # Metrics that are a peak, not an average — take the worst case over repeats.
 MAX_KEYS = ("peak_vram_bytes",)
@@ -143,6 +144,10 @@ def build_summary(
             "mean": round(statistics.fmean(kv) / 1e6, 2),
         }
 
+    if rows and rows[0].get("mean_block_size") is not None:
+        mbs = [r["mean_block_size"] for r in rows if r.get("mean_block_size") is not None]
+        summary["mean_block_size"] = _agg(mbs)
+
     if quality is not None:
         summary["quality"] = quality
 
@@ -168,6 +173,10 @@ def print_summary(summary: dict) -> None:
     if "kv_cache_mb" in summary:
         s = summary["kv_cache_mb"]
         print(f"KV cache    max={s['max']:.2f}MB  mean={s['mean']:.2f}MB")
+    if summary.get("mean_block_size"):
+        s = summary["mean_block_size"]
+        print(f"block size  mean={s['mean']:.2f}±{s['std']:.2f} tok/step "
+              f"(speculative acceptance)")
     if summary.get("quality"):
         q = summary["quality"]
         print(f"quality     perplexity={q['perplexity']:.3f} "

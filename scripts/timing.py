@@ -96,3 +96,86 @@ def finish_measure(
     if extra:
         metrics.update(extra)
     return metrics
+
+
+class BlockStreamer(BaseStreamer):
+    """Like CudaEventStreamer, but also records the token count of each block.
+
+    With assisted/speculative generation, generate() emits a *block* of accepted
+    tokens per verification step (not one token at a time), so block sizes
+    reveal the acceptance pattern: mean block size = tokens produced per target
+    forward pass, which is where the speedup comes from. For plain generation
+    every block is one token, so this degrades gracefully.
+    """
+
+    def __init__(self):
+        self.events: list[torch.cuda.Event] = []
+        self.block_sizes: list[int] = []
+        self._saw_prompt = False
+
+    def put(self, value):
+        if not self._saw_prompt:
+            self._saw_prompt = True
+            return
+        n = int(value.numel()) if hasattr(value, "numel") else len(value)
+        ev = torch.cuda.Event(enable_timing=True)
+        ev.record()
+        self.events.append(ev)
+        self.block_sizes.append(n)
+
+    def end(self):
+        pass
+
+
+def finish_measure_blocks(
+    gen_start: torch.cuda.Event,
+    events: list[torch.cuda.Event],
+    block_sizes: list[int],
+    prompt_tokens: int,
+    generated_tokens: int,
+    extra: dict | None = None,
+) -> dict:
+    """Metric dict for block-emitting (speculative) generation.
+
+    One event per accepted block. Per-token latency is undefined here (tokens
+    arrive in bursts), so we report throughput over the decode phase and
+    mean_block_size (tokens per target step) instead of ms/token percentiles.
+    """
+    gen_end = torch.cuda.Event(enable_timing=True)
+    gen_end.record()
+    torch.cuda.synchronize()
+
+    peak_vram = int(torch.cuda.max_memory_allocated())
+    total_ms = gen_start.elapsed_time(gen_end)
+    block_ms = [gen_start.elapsed_time(ev) for ev in events]
+
+    ttft_ms = block_ms[0] if block_ms else None
+    mean_block = statistics.fmean(block_sizes) if block_sizes else None
+
+    if len(block_ms) >= 2:
+        decode_total_s = (block_ms[-1] - block_ms[0]) / 1000.0
+        decode_tokens = sum(block_sizes[1:])  # tokens emitted after the first block
+        tokens_per_sec = decode_tokens / decode_total_s if decode_total_s > 0 else None
+        step_intervals = [block_ms[i] - block_ms[i - 1] for i in range(1, len(block_ms))]
+        ms_per_step_mean = statistics.fmean(step_intervals)
+    else:
+        tokens_per_sec = ms_per_step_mean = None
+
+    metrics = {
+        "prompt_tokens": prompt_tokens,
+        "generated_tokens": generated_tokens,
+        "events_recorded": len(events),
+        "n_blocks": len(block_sizes),
+        "mean_block_size": round(mean_block, 3) if mean_block is not None else None,
+        "total_ms": total_ms,
+        "ttft_ms": ttft_ms,
+        "tokens_per_sec": tokens_per_sec,
+        "ms_per_token_mean": None,
+        "ms_per_token_p50": None,
+        "ms_per_token_p95": None,
+        "ms_per_step_mean": ms_per_step_mean,
+        "peak_vram_bytes": peak_vram,
+    }
+    if extra:
+        metrics.update(extra)
+    return metrics
