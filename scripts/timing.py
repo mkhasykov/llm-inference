@@ -179,3 +179,55 @@ def finish_measure_blocks(
     if extra:
         metrics.update(extra)
     return metrics
+
+
+def finish_measure_batch(
+    gen_start: torch.cuda.Event,
+    events: list[torch.cuda.Event],
+    batch_size: int,
+    prompt_tokens_padded: int,
+    extra: dict | None = None,
+) -> dict:
+    """Metric dict for batched generation (batch_size > 1).
+
+    The streamer fires once per decode step, each step emitting `batch_size`
+    new tokens (one per sequence). So `tokens_per_sec` is AGGREGATE decode
+    throughput across the batch (batch_size tokens per step), which is the
+    point of batching; per-token percentiles within a step are undefined.
+    `generated_tokens` is the batch total (batch_size x per-sequence length).
+    """
+    gen_end = torch.cuda.Event(enable_timing=True)
+    gen_end.record()
+    torch.cuda.synchronize()
+
+    peak_vram = int(torch.cuda.max_memory_allocated())
+    total_ms = gen_start.elapsed_time(gen_end)
+    token_ms = [gen_start.elapsed_time(ev) for ev in events]
+
+    per_seq_tokens = len(token_ms)  # one decode step == one token per sequence
+    ttft_ms = token_ms[0] if token_ms else None
+
+    if len(token_ms) >= 2:
+        decode_total_s = (token_ms[-1] - token_ms[0]) / 1000.0
+        decode_tokens = batch_size * (len(token_ms) - 1)
+        tokens_per_sec = decode_tokens / decode_total_s if decode_total_s > 0 else None
+    else:
+        tokens_per_sec = None
+
+    metrics = {
+        "prompt_tokens": prompt_tokens_padded,
+        "generated_tokens": batch_size * per_seq_tokens,
+        "per_seq_tokens": per_seq_tokens,
+        "batch_size": batch_size,
+        "events_recorded": len(events),
+        "total_ms": total_ms,
+        "ttft_ms": ttft_ms,
+        "tokens_per_sec": tokens_per_sec,
+        "ms_per_token_mean": None,
+        "ms_per_token_p50": None,
+        "ms_per_token_p95": None,
+        "peak_vram_bytes": peak_vram,
+    }
+    if extra:
+        metrics.update(extra)
+    return metrics

@@ -20,6 +20,7 @@ from runner import run_dataset
 from timing import BlockStreamer, begin_measure, finish_measure_blocks
 
 from benchmark_baseline import warmup
+from benchmark_quant import load_quant
 
 
 def make_run_one(model, draft, tokenizer, max_new_tokens, *,
@@ -63,6 +64,12 @@ def parse_args():
         default="Qwen/Qwen2.5-0.5B-Instruct",
         help="small assistant model proposing tokens (must share the target's tokenizer)",
     )
+    p.add_argument(
+        "--quant",
+        default="none",
+        choices=["none", "int8", "nf4", "fp4", "awq", "gptq-int4", "gptq-int8"],
+        help="quantize the TARGET (draft stays bf16) — for spec×quant combinations",
+    )
     return p.parse_args()
 
 
@@ -70,13 +77,18 @@ def main():
     args = parse_args()
     require_cuda_and_dataset(args)
 
-    print(f"loading target: {args.model}")
-    model, tokenizer = load_model_and_tokenizer(args.model)
+    if args.quant == "none":
+        print(f"loading target: {args.model}")
+        model, tokenizer = load_model_and_tokenizer(args.model)
+        target_fmt, backend = dtype_str(model), None
+    else:
+        print(f"loading target: {args.model}  quant={args.quant}")
+        model, tokenizer, _repo, backend = load_quant(args.model, args.quant)
+        target_fmt = args.quant
     print(f"loading draft:  {args.draft_model}")
     draft, _ = load_model_and_tokenizer(args.draft_model)
-    dtype = dtype_str(model)
     gpu_name = torch.cuda.get_device_name(0)
-    print(f"models loaded, dtype={dtype}, gpu={gpu_name}")
+    print(f"models loaded, target_fmt={target_fmt}, backend={backend}, gpu={gpu_name}")
 
     run_one = make_run_one(
         model, draft, tokenizer, args.max_new_tokens,
@@ -94,8 +106,11 @@ def main():
         "fixed_length": args.fixed_length,
         "method": "speculative",
         "draft_model": args.draft_model,
-        "dtype": dtype,
+        "quant": args.quant,
+        "target_format": target_fmt,
+        "backend": backend,
     }
+    kind = "spec" if args.quant == "none" else f"spec_{args.quant}"
 
     # No quality axis: greedy assisted decoding is lossless (= target greedy).
     run_dataset(
@@ -103,7 +118,7 @@ def main():
         repeats=args.repeats,
         run_one=run_one,
         tokenizer=tokenizer,
-        kind="spec",
+        kind=kind,
         model_id=args.model,
         gpu=gpu_name,
         gen_settings=gen_settings,
