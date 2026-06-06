@@ -33,6 +33,35 @@ MATRIX = [
 ]
 
 
+def cell_format(extra: list[str]) -> str:
+    """Weight format a cell exercises: the --quant value, else native bf16."""
+    if "--quant" in extra:
+        return extra[extra.index("--quant") + 1]
+    return "bf16"
+
+
+def run_quality_sweep(cells, args) -> None:
+    """Measure perplexity once per UNIQUE weight format across the cells,
+    instead of per speed run (lossless methods share the same number)."""
+    formats = []
+    for _label, _script, extra in cells:
+        fmt = cell_format(extra)
+        if fmt not in formats:
+            formats.append(fmt)
+    print(f"\n=== quality sweep: {formats} (once per format) ===", flush=True)
+    for fmt in formats:
+        cmd = [
+            sys.executable, str(REPO / "scripts" / "eval_quality.py"),
+            "--quant", ("none" if fmt == "bf16" else fmt),
+            "--quality-max-tokens", str(args.quality_max_tokens),
+            "--out-dir", args.out_dir,
+        ]
+        if args.model:
+            cmd += ["--model", args.model]
+        print(f"  quality[{fmt}]: {' '.join(cmd)}", flush=True)
+        subprocess.run(cmd, cwd=REPO)
+
+
 def parse_args():
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument("--limit", type=int, default=80)
@@ -53,14 +82,15 @@ def main():
         print(f"no cells match --only {args.only}; labels: {[c[0] for c in MATRIX]}")
         sys.exit(1)
 
+    # Speed cells never measure quality: perplexity depends only on
+    # (model, weight format), not on the inference method/cache. It is
+    # measured once per unique format by the quality sweep below.
     common = [
         "--limit", str(args.limit),
         "--repeats", str(args.repeats),
         "--max-new-tokens", str(args.max_new_tokens),
         "--out-dir", args.out_dir,
     ]
-    if args.quality:
-        common += ["--quality", "--quality-max-tokens", str(args.quality_max_tokens)]
     if args.model:
         common += ["--model", args.model]
 
@@ -75,6 +105,9 @@ def main():
         status = "ok" if rc == 0 else f"FAIL(rc={rc})"
         results.append((label, status, mins))
         print(f"===[{i}/{len(cells)}] {label}: {status} in {mins:.1f} min", flush=True)
+
+    if args.quality:
+        run_quality_sweep(cells, args)
 
     print("\n=== matrix done ===")
     for label, status, mins in results:
