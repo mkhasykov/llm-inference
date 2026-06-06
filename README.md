@@ -91,31 +91,39 @@ did we use", and shows what each method moves: e.g. nf4 cuts `weight_bytes`
 
 ## Results
 
-Qwen2.5-1.5B-Instruct, RTX 3090, bf16, 80 MT-Bench prompts, max_new_tokens=256, greedy.
+Qwen2.5-1.5B-Instruct, RTX 3090, 80 MT-Bench prompts, max_new_tokens=256, greedy, **repeats=3**.
+Quality = WikiText-2 (raw) test perplexity, lower is better. Perplexity is a property of the
+weight format only, so the three bf16 (lossless) rows share the same number.
 
-| run                                  | tokens/sec mean | TTFT mean (ms) | peak VRAM | KV cache max |
-| ------------------------------------ | --------------: | -------------: | --------: | -----------: |
-| baseline, `--no-cache`               |           47.10 |          20.71 |   3.14 GB |            — |
-| manual KV loop (`DynamicCache`)      |           61.82 |          19.57 |   3.23 GB |      17.6 MB |
-| manual KV loop (`PreallocatedKVCache`) |         58.49 |          18.62 |   3.23 GB |      18.4 MB |
+| config                | tokens/sec (mean ± std) | peak VRAM | perplexity | ceiling tok/s | MBU   |
+| --------------------- | ----------------------: | --------: | ---------: | ------------: | ----: |
+| baseline, `--no-cache`|              33.6 ± 3.8 |   3.14 GB |      9.159 |           303 | 11.1% |
+| manual_kv (`Dynamic`) |              52.2 ± 4.3 |   3.23 GB |      9.159 |           303 | 17.2% |
+| static_kv (`Prealloc`)|              52.8 ± 2.8 |   3.23 GB |      9.159 |           303 | 17.4% |
+| quant int8            |              11.2 ± 0.5 |   1.87 GB |      9.209 |           527 |  2.1% |
+| quant nf4             |              44.5 ± 2.5 |   1.22 GB |      9.884 |           834 |  5.3% |
+| quant fp4             |              44.5 ± 2.2 |   1.22 GB |     10.825 |           834 |  5.3% |
 
-`PreallocatedKVCache` allocates the full `(prompt_tokens + max_new_tokens)`
-KV buffer once per prompt and writes new tokens in place — no `torch.cat`
-in the decode hot path. Output is **bit-exact** with `DynamicCache` (greedy
-decode, verified on the same prompts).
+Findings (greedy, batch=1, single-stream — i.e. per-request latency):
 
-The throughput dip is real and worth noting: returning a slice
-`buffer[:, :, :current_len, :]` is a **non-contiguous** view (stride
-matches `max_cache_len`, not `current_len`). PyTorch SDPA dispatches
-slower kernels on non-contiguous K/V, and that cost outweighs the
-saved `torch.cat`. Returning the full buffer would be contiguous but
-requires materializing the attention mask explicitly (HF's
-`_ignore_causal_mask_sdpa` shortcut breaks when `query_length == 1` and
-`kv_length > query_length` — zero-padded slots leak into softmax). The
-next step toward an actually-faster cache is paged attention, which
-sidesteps both issues.
+- **KV-cache is the clear win**: +55% tok/s (33.6 → 52) at zero quality cost.
+- **Pre-allocated vs dynamic cache is a tie** here (52.8 vs 52.2, within run-to-run
+  std) — the earlier apparent slowdown washes out at full scale. The pre-allocated
+  buffer returns a **non-contiguous** view (`buffer[:, :, :len, :]`), which can push
+  PyTorch SDPA onto slower kernels; its real payoff is downstream (static shapes for
+  CUDA graphs, KV quantization, paged attention), not raw batch-1 speed.
+- **Quantization trades VRAM for throughput, not the reverse**: 4-bit cuts VRAM ~2.6×
+  but is slower than bf16+cache; int8 is near-lossless in quality yet the slowest.
+  The roofline explains it — nf4 lifts the ceiling ~3× (834 vs 303) but MBU collapses
+  to ~5% (dequant-on-the-fly), so the headroom goes unused.
+- **NF4 beats plain FP4** at the same 4-bit budget (9.88 vs 10.83 perplexity) —
+  the distribution-aware format earns its keep.
+- **Everything is memory-bound** (intensity 1–4 ≪ ridge ~76 FLOP/byte) and MBU is only
+  2–17%, so there is large headroom that single-stream decode cannot reach — the
+  motivation for the batch-size axis.
 
-Full summary JSON per run: [`results/`](results/).
+Full summary JSON per run: [`results/`](results/). Regenerate the roofline table with
+`python scripts/roofline.py results/*.json`.
 
 ## Layout
 
