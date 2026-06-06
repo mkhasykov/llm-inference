@@ -1,0 +1,46 @@
+{
+  "run_id": "quant_fp4_20260606T171429Z",
+  "kind": "quant_fp4",
+  "model": "Qwen/Qwen2.5-1.5B-Instruct",
+  "gpu": "NVIDIA GeForce RTX 3090",
+  "git_commit": "9b312e5",
+  "timestamp_utc": "2026-06-06T17:33:46.088485+00:00",
+  "n_prompts": 80,
+  "repeats": 3,
+  "gen_settings": {
+    "max_new_tokens": 256,
+    "do_sample": false,
+    "use_cache": true,
+    "quant": "fp4",
+    "compute_dtype": "bfloat16"
+  },
+  "model_info": {
+    "n_params": 888616448,
+    "param_bytes": 1122135552
+  },
+  "tokens_per_sec": {
+    "mean": 44.518,
+    "std": 2.236,
+    "min": 38.368,
+    "max": 48.801,
+    "n": 80
+  },
+  "ttft_ms": {
+    "mean": 41.646,
+    "std": 11.169,
+    "min": 31.791,
+    "max": 82.361,
+    "n": 80
+  },
+  "peak_vram_gb": {
+    "max": 1.221
+  },
+  "tokens_per_sec_jitter_mean": 3.163,
+  "quality": {
+    "perplexity": 10.8245,
+    "corpus": "wikitext-2-raw-v1:test",
+    "n_tokens": 298938,
+    "window": 1024,
+    "stride": 512
+  }
+}
