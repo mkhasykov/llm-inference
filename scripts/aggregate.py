@@ -42,8 +42,12 @@ def speed_format(summary):
 def load_results(results_dir):
     speed, quality = [], {}
     for path in glob.glob(str(Path(results_dir) / "*.json")):
+        if Path(path).name.startswith("summary_table"):
+            continue  # our own aggregate output, not a result
         with open(path) as f:
             obj = json.load(f)
+        if not isinstance(obj, dict):
+            continue
         if obj.get("kind") == "quality":
             quality[(obj["model"], obj.get("quant", "none"))] = obj
         elif "tokens_per_sec" in obj:
