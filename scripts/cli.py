@@ -35,6 +35,19 @@ def common_parser(description: str) -> argparse.ArgumentParser:
         default=50000,
         help="cap corpus tokens for perplexity; 0 = full test split",
     )
+    p.add_argument(
+        "--fixed-length",
+        action="store_true",
+        help="force exactly --max-new-tokens per prompt (min_new_tokens=max, "
+             "ignore EOS) so every config does identical work — for fair speed "
+             "comparison and clean batching",
+    )
+    p.add_argument(
+        "--dump-text",
+        action="store_true",
+        help="save decoded generated text per prompt in the JSONL (for "
+             "fidelity checks and qualitative examples)",
+    )
     return p
 
 

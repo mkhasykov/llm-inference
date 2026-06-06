@@ -60,7 +60,10 @@ def main():
     gpu_name = torch.cuda.get_device_name(0)
     print(f"model loaded, quant={args.quant}, compute_dtype={compute_dtype}, gpu={gpu_name}")
 
-    run_one = make_run_one(model, tokenizer, args.max_new_tokens, use_cache)
+    run_one = make_run_one(
+        model, tokenizer, args.max_new_tokens, use_cache,
+        fixed_length=args.fixed_length, dump_text=args.dump_text,
+    )
     print("warmup...")
     warmup(run_one, tokenizer)
 
@@ -71,6 +74,7 @@ def main():
         "max_new_tokens": args.max_new_tokens,
         "do_sample": False,
         "use_cache": use_cache,
+        "fixed_length": args.fixed_length,
         "quant": args.quant,
         "compute_dtype": compute_dtype,
     }

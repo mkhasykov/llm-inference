@@ -107,6 +107,7 @@ def build_summary(
     repeats: int,
     quality: dict | None = None,
     model_info: dict | None = None,
+    gpu_state: dict | None = None,
 ) -> dict:
     tps = _prompt_means(rows, "tokens_per_sec")
     ttft = _prompt_means(rows, "ttft_ms")
@@ -124,6 +125,7 @@ def build_summary(
         "repeats": repeats,
         "gen_settings": gen_settings,
         "model_info": model_info,
+        "gpu_state": gpu_state,
         "tokens_per_sec": _agg(tps),
         "ttft_ms": _agg(ttft),
         "peak_vram_gb": {"max": round(max(vram) / 1e9, 3)} if vram else None,

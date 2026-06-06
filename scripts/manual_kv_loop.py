@@ -25,7 +25,8 @@ def cache_size_bytes(cache: DynamicCache) -> int:
     return total
 
 
-def make_run_one(model, tokenizer, max_new_tokens: int, eos_ids: set[int]):
+def make_run_one(model, tokenizer, max_new_tokens, eos_ids, *,
+                 fixed_length=False, dump_text=False):
     def run_one(prompt_text: str) -> dict:
         prompt_ids = tokenizer(prompt_text, return_tensors="pt").input_ids.to(model.device)
         prompt_tokens = int(prompt_ids.shape[1])
@@ -33,13 +34,16 @@ def make_run_one(model, tokenizer, max_new_tokens: int, eos_ids: set[int]):
         cache = DynamicCache()
         gen_start = begin_measure()
         with torch.inference_mode():
-            events, n_generated = manual_decode(
-                model, prompt_ids, cache, max_new_tokens, eos_ids
+            events, n_generated, tokens = manual_decode(
+                model, prompt_ids, cache, max_new_tokens, eos_ids,
+                fixed_length=fixed_length, collect_tokens=dump_text,
             )
         extra = {
             "cache_kv_bytes": cache_size_bytes(cache),
             "cache_seq_len": int(cache.get_seq_length()),
         }
+        if dump_text and tokens is not None:
+            extra["generated_text"] = tokenizer.decode(tokens)
         return finish_measure(gen_start, events, prompt_tokens, n_generated, extra)
 
     return run_one
@@ -61,7 +65,10 @@ def main():
     eos_ids = get_eos_ids(model, tokenizer)
     print(f"model loaded, dtype={dtype}, gpu={gpu_name}, eos_ids={sorted(eos_ids)}")
 
-    run_one = make_run_one(model, tokenizer, args.max_new_tokens, eos_ids)
+    run_one = make_run_one(
+        model, tokenizer, args.max_new_tokens, eos_ids,
+        fixed_length=args.fixed_length, dump_text=args.dump_text,
+    )
     print("warmup...")
     warmup(run_one, tokenizer)
 
@@ -73,6 +80,7 @@ def main():
         "do_sample": False,
         "use_cache": True,
         "cache_class": "DynamicCache",
+        "fixed_length": args.fixed_length,
         "dtype": dtype,
     }
 

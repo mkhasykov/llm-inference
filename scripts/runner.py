@@ -11,6 +11,7 @@ import json
 from pathlib import Path
 
 from data import build_prompt
+from env import gpu_state
 from summary import aggregate_repeats, build_summary, print_summary
 
 
@@ -57,6 +58,7 @@ def run_dataset(
     out_path = out_dir / f"{kind}_{ts}.jsonl"
     print(f"running {len(items)} prompts × {repeats} repeats → {out_path}")
 
+    state_start = gpu_state()
     rows = []
     with out_path.open("w") as f:
         for item in items:
@@ -87,6 +89,7 @@ def run_dataset(
         repeats=repeats,
         quality=quality,
         model_info=model_info,
+        gpu_state={"start": state_start, "end": gpu_state()},
     )
     summary_path = out_path.with_suffix(".json")
     with summary_path.open("w") as f:

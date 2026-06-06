@@ -14,24 +14,32 @@ from runner import run_dataset
 from timing import CudaEventStreamer, begin_measure, finish_measure
 
 
-def make_run_one(model, tokenizer, max_new_tokens: int, use_cache: bool):
+def make_run_one(model, tokenizer, max_new_tokens, use_cache, *,
+                 fixed_length=False, dump_text=False):
     def run_one(prompt_text: str) -> dict:
         inputs = tokenizer(prompt_text, return_tensors="pt").to(model.device)
         prompt_tokens = int(inputs["input_ids"].shape[1])
 
         streamer = CudaEventStreamer()
+        gen_kwargs = {
+            "max_new_tokens": max_new_tokens,
+            "do_sample": False,
+            "use_cache": use_cache,
+            "streamer": streamer,
+            "pad_token_id": tokenizer.eos_token_id,
+        }
+        if fixed_length:
+            gen_kwargs["min_new_tokens"] = max_new_tokens
+
         gen_start = begin_measure()
         with torch.inference_mode():
-            output = model.generate(
-                **inputs,
-                max_new_tokens=max_new_tokens,
-                do_sample=False,
-                use_cache=use_cache,
-                streamer=streamer,
-                pad_token_id=tokenizer.eos_token_id,
-            )
+            output = model.generate(**inputs, **gen_kwargs)
         generated_tokens = int(output.shape[1] - prompt_tokens)
-        return finish_measure(gen_start, streamer.events, prompt_tokens, generated_tokens)
+
+        extra = None
+        if dump_text:
+            extra = {"generated_text": tokenizer.decode(output[0, prompt_tokens:])}
+        return finish_measure(gen_start, streamer.events, prompt_tokens, generated_tokens, extra)
 
     return run_one
 
@@ -66,7 +74,10 @@ def main():
     gpu_name = torch.cuda.get_device_name(0)
     print(f"model loaded, dtype={dtype}, gpu={gpu_name}, use_cache={use_cache}")
 
-    run_one = make_run_one(model, tokenizer, args.max_new_tokens, use_cache)
+    run_one = make_run_one(
+        model, tokenizer, args.max_new_tokens, use_cache,
+        fixed_length=args.fixed_length, dump_text=args.dump_text,
+    )
     print("warmup...")
     warmup(run_one, tokenizer)
 
@@ -77,6 +88,7 @@ def main():
         "max_new_tokens": args.max_new_tokens,
         "do_sample": False,
         "use_cache": use_cache,
+        "fixed_length": args.fixed_length,
         "dtype": dtype,
     }
 
