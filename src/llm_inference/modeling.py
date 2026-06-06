@@ -36,6 +36,20 @@ def dtype_str(model) -> str:
     return str(next(model.parameters()).dtype).replace("torch.", "")
 
 
+def model_stats(model) -> dict:
+    """Parameter count and on-device weight footprint.
+
+    `param_bytes` sums params + buffers as actually stored, so for a
+    bitsandbytes model it reflects the packed 4-bit/8-bit weights (plus quant
+    scales) — the real number of bytes read per decode step, which is what the
+    roofline ceiling divides bandwidth by.
+    """
+    n_params = sum(p.numel() for p in model.parameters())
+    param_bytes = sum(p.numel() * p.element_size() for p in model.parameters())
+    param_bytes += sum(b.numel() * b.element_size() for b in model.buffers())
+    return {"n_params": int(n_params), "param_bytes": int(param_bytes)}
+
+
 def get_eos_ids(model, tokenizer) -> set[int]:
     """Collect every token id that should stop generation. Manual decode
     loops need this because they don't go through generate()'s stopping
