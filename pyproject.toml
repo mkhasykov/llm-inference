@@ -10,6 +10,7 @@ dependencies = [
     "bitsandbytes>=0.49",
     "gptqmodel>=7.0",
     "optimum>=2.1",
+    "lm-eval>=0.4",
 ]
 
 [tool.uv]
