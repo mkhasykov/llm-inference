@@ -59,6 +59,23 @@ To regenerate a summary from a JSONL (e.g. after a schema change):
 python scripts/jsonl_to_summary.py results/<run_id>.jsonl
 ```
 
+## Roofline analysis
+
+Single-stream decode reads the whole weight set from VRAM per token, so it is
+memory-bandwidth-bound: `tokens/sec_max = bandwidth / weight_bytes`. This
+offline tool (no GPU needed) reports, per run, that ceiling, the achieved
+fraction (MBU), and the arithmetic-intensity regime:
+
+```bash
+python scripts/roofline.py results/*.json
+```
+
+It turns raw tokens/sec into "what fraction of the only resource that matters
+did we use", and shows what each method moves: e.g. nf4 cuts `weight_bytes`
+~3× so the ceiling rises ~3×, but if MBU collapses the speedup wasn't realized
+(dequant overhead). GPU specs are matched by device name; override with
+`--bandwidth-gb-s` / `--peak-fp16-tflops`.
+
 ## Results
 
 Qwen2.5-1.5B-Instruct, RTX 3090, bf16, 80 MT-Bench prompts, max_new_tokens=256, greedy.
@@ -100,11 +117,13 @@ src/llm_inference/              # shared harness (scripts are thin wrappers over
   summary.py                    #   repeat aggregation + per-run summary (mean ± std)
   quality.py                    #   WikiText-2 perplexity
   cli.py                        #   shared CLI args, env checks, optional quality eval
+  roofline.py                   #   bandwidth ceiling, MBU, intensity regime
   runner.py                     #   per-prompt loop: repeats → aggregate → write
 scripts/benchmark_baseline.py   # vanilla HF generate (--no-cache for the floor)
 scripts/manual_kv_loop.py       # explicit prefill+decode with DynamicCache
 scripts/static_kv_loop.py       # same loop with our PreallocatedKVCache
 scripts/benchmark_quant.py      # weight-quantized generate (bitsandbytes int8/nf4/fp4)
+scripts/roofline.py             # offline roofline analysis over result summaries
 scripts/jsonl_to_summary.py     # regenerate summary from per-prompt JSONL
 results/                        # per-run summary JSON (per-prompt JSONL gitignored)
 ```

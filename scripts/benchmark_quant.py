@@ -19,7 +19,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
 from llm_inference.cli import common_parser, maybe_quality, require_cuda_and_dataset
 from llm_inference.data import load_dataset
-from llm_inference.modeling import load_model_and_tokenizer
+from llm_inference.modeling import load_model_and_tokenizer, model_stats
 from llm_inference.runner import run_dataset
 
 from benchmark_baseline import make_run_one, warmup
@@ -91,6 +91,7 @@ def main():
         gen_settings=gen_settings,
         out_dir=args.out_dir,
         quality=quality,
+        model_info=model_stats(model),
     )
 
 

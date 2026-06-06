@@ -18,7 +18,7 @@ from llm_inference.caches import PreallocatedKVCache
 from llm_inference.cli import common_parser, maybe_quality, require_cuda_and_dataset
 from llm_inference.data import build_prompt, load_dataset
 from llm_inference.decode import manual_decode
-from llm_inference.modeling import dtype_str, get_eos_ids, load_model_and_tokenizer
+from llm_inference.modeling import dtype_str, get_eos_ids, load_model_and_tokenizer, model_stats
 from llm_inference.runner import run_dataset
 from llm_inference.timing import begin_measure, finish_measure
 
@@ -94,6 +94,7 @@ def main():
         gen_settings=gen_settings,
         out_dir=args.out_dir,
         quality=quality,
+        model_info=model_stats(model),
     )
 
 

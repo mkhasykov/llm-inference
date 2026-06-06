@@ -45,6 +45,7 @@ def run_dataset(
     gen_settings: dict,
     out_dir: Path,
     quality: dict | None = None,
+    model_info: dict | None = None,
 ) -> dict:
     """Run `items` through `run_one`, R repeats each, and write results.
 
@@ -85,6 +86,7 @@ def run_dataset(
         gen_settings=gen_settings,
         repeats=repeats,
         quality=quality,
+        model_info=model_info,
     )
     summary_path = out_path.with_suffix(".json")
     with summary_path.open("w") as f:
