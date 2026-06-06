@@ -1,40 +1,28 @@
 """Weight-quantized generation benchmark on MT-Bench prompts.
 
-Same measurement path as `benchmark_baseline.py` (model.generate() with a
-CudaEventStreamer recording per-token CUDA events), but the model is loaded
-with bitsandbytes weight quantization. Quantization is purely a load-time
-change — the decode loop, metrics, and KV-cache (on) are identical to the
-baseline, so the delta is attributable to the quantized weights alone.
+Same generate path as benchmark_baseline.py — only the model load changes
+(a BitsAndBytesConfig per --quant mode). KV-cache is on, so the measured
+delta is attributable to the quantized weights alone. Pair with --quality to
+capture the perplexity cost of quantization (it is NOT lossless, unlike spec
+decoding).
 
-Modes:
-  int8  LLM.int8() 8-bit weights
-  nf4   4-bit NormalFloat + double quant, bf16 compute (QLoRA default)
-  fp4   4-bit float + double quant, bf16 compute
-
-Headline metric for quantization is peak VRAM, not throughput: 4-bit weights
-cut the model footprint ~4x, but dequant-on-the-fly can leave tokens/sec
-flat or slightly slower on a small model. Greedy output is NOT identical to
-fp16 (quantization changes the arithmetic) — unlike speculative decoding.
+Modes: int8 (LLM.int8()), nf4 / fp4 (4-bit + double quant, bf16 compute).
 """
 
-import argparse
-import datetime as dt
-import json
 import sys
 from pathlib import Path
 
 import torch
-from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
+from transformers import BitsAndBytesConfig
 
-# Reuse the baseline generate-path helpers verbatim so the measurement code
-# stays in lockstep — quant differs only in how the model is loaded.
-from benchmark_baseline import (
-    build_prompt,
-    load_dataset,
-    run_one,
-    warmup,
-)
-from summary import build_summary, print_summary
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
+
+from llm_inference.cli import common_parser, maybe_quality, require_cuda_and_dataset
+from llm_inference.data import load_dataset
+from llm_inference.modeling import load_model_and_tokenizer
+from llm_inference.runner import run_dataset
+
+from benchmark_baseline import make_run_one, warmup
 
 
 def build_quant_config(mode: str) -> BitsAndBytesConfig:
@@ -51,12 +39,7 @@ def build_quant_config(mode: str) -> BitsAndBytesConfig:
 
 
 def parse_args():
-    p = argparse.ArgumentParser(description=__doc__)
-    p.add_argument("--model", default="Qwen/Qwen2.5-1.5B-Instruct")
-    p.add_argument("--dataset", default="data/mt_bench/question.jsonl", type=Path)
-    p.add_argument("--limit", type=int, default=5)
-    p.add_argument("--max-new-tokens", type=int, default=256)
-    p.add_argument("--out-dir", default="results", type=Path)
+    p = common_parser(__doc__)
     p.add_argument(
         "--quant",
         choices=["int8", "nf4", "fp4"],
@@ -68,41 +51,26 @@ def parse_args():
 
 def main():
     args = parse_args()
-
-    if not torch.cuda.is_available():
-        print("CUDA not available; this benchmark requires a GPU.", file=sys.stderr)
-        sys.exit(1)
-
-    if not args.dataset.exists():
-        print(f"dataset not found: {args.dataset}", file=sys.stderr)
-        sys.exit(1)
+    require_cuda_and_dataset(args)
 
     use_cache = True  # quantization is always benchmarked with the KV-cache on
     compute_dtype = "bfloat16"
 
-    args.out_dir.mkdir(parents=True, exist_ok=True)
-    ts = dt.datetime.now(dt.timezone.utc).strftime("%Y%m%dT%H%M%SZ")
-    out_path = args.out_dir / f"quant_{args.quant}_{ts}.jsonl"
-
     print(f"loading model: {args.model}  quant={args.quant}")
-    tokenizer = AutoTokenizer.from_pretrained(args.model)
-    model = AutoModelForCausalLM.from_pretrained(
+    model, tokenizer = load_model_and_tokenizer(
         args.model,
         quantization_config=build_quant_config(args.quant),
         device_map="auto",
     )
-    model.eval()
     gpu_name = torch.cuda.get_device_name(0)
-    print(
-        f"model loaded, quant={args.quant}, compute_dtype={compute_dtype}, "
-        f"gpu={gpu_name}, use_cache={use_cache}"
-    )
+    print(f"model loaded, quant={args.quant}, compute_dtype={compute_dtype}, gpu={gpu_name}")
 
+    run_one = make_run_one(model, tokenizer, args.max_new_tokens, use_cache)
     print("warmup...")
-    warmup(model, tokenizer, args.max_new_tokens, use_cache)
+    warmup(run_one, tokenizer)
 
+    quality = maybe_quality(args, model, tokenizer)
     items = load_dataset(args.dataset, args.limit)
-    print(f"running {len(items)} prompts → {out_path}")
 
     gen_settings = {
         "max_new_tokens": args.max_new_tokens,
@@ -112,50 +80,18 @@ def main():
         "compute_dtype": compute_dtype,
     }
 
-    rows = []
-    with out_path.open("w") as out_f:
-        for item in items:
-            user_text = item["turns"][0]
-            prompt_text = build_prompt(tokenizer, user_text)
-            metrics = run_one(model, tokenizer, prompt_text, args.max_new_tokens, use_cache)
-
-            row = {
-                "model": args.model,
-                "question_id": item["question_id"],
-                "category": item["category"],
-                "gen_settings": gen_settings,
-                "gpu": gpu_name,
-                "timestamp_utc": dt.datetime.now(dt.timezone.utc).isoformat(),
-                **metrics,
-            }
-            out_f.write(json.dumps(row) + "\n")
-            out_f.flush()
-            rows.append(row)
-
-            tps = f"{metrics['tokens_per_sec']:.1f}" if metrics["tokens_per_sec"] else "n/a"
-            ttft = f"{metrics['ttft_ms']:.1f}" if metrics["ttft_ms"] else "n/a"
-            print(
-                f"  q{item['question_id']} [{item['category']}] "
-                f"prompt={metrics['prompt_tokens']} gen={metrics['generated_tokens']} "
-                f"ttft={ttft}ms tok/s={tps} "
-                f"vram={metrics['peak_vram_bytes'] / 1e9:.2f}GB"
-            )
-
-    summary = build_summary(
-        rows,
-        run_id=out_path.stem,
-        kind="quant",
-        model=args.model,
+    run_dataset(
+        items=items,
+        repeats=args.repeats,
+        run_one=run_one,
+        tokenizer=tokenizer,
+        kind=f"quant_{args.quant}",
+        model_id=args.model,
         gpu=gpu_name,
         gen_settings=gen_settings,
+        out_dir=args.out_dir,
+        quality=quality,
     )
-    summary_path = out_path.with_suffix(".json")
-    with summary_path.open("w") as f:
-        json.dump(summary, f, indent=2)
-
-    print("\n=== summary ===")
-    print_summary(summary)
-    print(f"results:  per-prompt={out_path}  summary={summary_path}")
 
 
 if __name__ == "__main__":

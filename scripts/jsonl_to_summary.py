@@ -1,28 +1,26 @@
-"""Build a results/<run>.json summary from a results/<run>.jsonl file.
+"""Rebuild a results/<run>.json summary from a results/<run>.jsonl file.
 
-Use when:
-- migrating an old JSONL run to the new summary-only format;
-- the summary schema changes and you want to regenerate without
-  re-running the benchmark.
+Use when the summary schema changes and you want to regenerate without
+re-running the benchmark. Expects current-schema per-prompt rows (aggregated
+nested metrics + "repeats"); older flat-schema JSONLs are not supported.
 """
 
 import argparse
 import json
+import re
+import sys
 from pathlib import Path
 
-from summary import build_summary
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
+
+from llm_inference.summary import build_summary
+
+# run_id stems are "<kind>_<UTC timestamp>"; strip the timestamp to get kind.
+_TS_RE = re.compile(r"_\d{8}T\d{6}Z$")
 
 
 def infer_kind(stem: str) -> str:
-    if stem.startswith("manual_kv"):
-        return "manual_kv"
-    if stem.startswith("static_kv"):
-        return "static_kv"
-    if stem.startswith("baseline"):
-        return "baseline"
-    if stem.startswith("quant"):
-        return "quant"
-    return "unknown"
+    return _TS_RE.sub("", stem) or "unknown"
 
 
 def main():
@@ -42,6 +40,7 @@ def main():
             model=rows[0]["model"],
             gpu=rows[0]["gpu"],
             gen_settings=rows[0]["gen_settings"],
+            repeats=rows[0].get("repeats", 1),
         )
         out_path = jsonl_path.with_suffix(".json")
         with out_path.open("w") as f:
