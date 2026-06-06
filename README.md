@@ -26,15 +26,20 @@ python scripts/manual_kv_loop.py --limit 80
 
 # same loop, our own pre-allocated cache (no torch.cat in decode)
 python scripts/static_kv_loop.py --limit 80
+
+# weight-quantized generation via bitsandbytes (KV-cache on), nf4 / fp4 / int8
+python scripts/benchmark_quant.py --limit 80 --quant nf4
 ```
 
 Default model is `Qwen/Qwen2.5-1.5B-Instruct` (auto-downloaded on first run). MT-Bench prompts are in `data/mt_bench/question.jsonl`.
 
-Key flags (both scripts):
+Key flags (all benchmark scripts):
 
 - `--model <hf-id>` — alternate model
 - `--limit <N>` — number of prompts (default 5; full set is 80)
 - `--max-new-tokens <N>` — generation length (default 256)
+
+`benchmark_quant.py` additionally takes `--quant {int8,nf4,fp4}` (default `nf4`). It reuses the baseline generate path, so the only variable is the quantized weights.
 
 Each run writes two files into `results/`:
 
@@ -83,6 +88,7 @@ scripts/benchmark_baseline.py   # vanilla HF baseline
 scripts/manual_kv_loop.py       # explicit prefill+decode with DynamicCache
 scripts/static_kv_loop.py       # same loop with our PreallocatedKVCache
 scripts/preallocated_kv_cache.py # Cache subclass: pre-allocated KV buffer
+scripts/benchmark_quant.py      # weight-quantized generate (bitsandbytes int8/nf4/fp4)
 scripts/summary.py              # shared summary builder (imported by the above)
 scripts/jsonl_to_summary.py     # regenerate summary from per-prompt JSONL
 results/                        # per-run summary JSON (per-prompt JSONL gitignored)
