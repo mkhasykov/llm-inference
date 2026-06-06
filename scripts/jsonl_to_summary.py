@@ -16,8 +16,12 @@ from summary import build_summary
 def infer_kind(stem: str) -> str:
     if stem.startswith("manual_kv"):
         return "manual_kv"
+    if stem.startswith("static_kv"):
+        return "static_kv"
     if stem.startswith("baseline"):
         return "baseline"
+    if stem.startswith("quant"):
+        return "quant"
     return "unknown"
 
 
