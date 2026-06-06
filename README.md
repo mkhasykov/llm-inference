@@ -29,6 +29,9 @@ python scripts/static_kv_loop.py --limit 80
 
 # weight-quantized generation via bitsandbytes (KV-cache on), nf4 / fp4 / int8
 python scripts/benchmark_quant.py --limit 80 --quant nf4
+
+# run the whole reference matrix (one subprocess per config, fresh GPU each)
+python scripts/run_matrix.py --limit 80 --repeats 3 --quality --quality-max-tokens 0
 ```
 
 Default model is `Qwen/Qwen2.5-1.5B-Instruct` (auto-downloaded on first run). MT-Bench prompts are in `data/mt_bench/question.jsonl`.
@@ -123,6 +126,7 @@ scripts/benchmark_baseline.py   # vanilla HF generate (--no-cache for the floor)
 scripts/manual_kv_loop.py       # explicit prefill+decode with DynamicCache
 scripts/static_kv_loop.py       # same loop with our PreallocatedKVCache
 scripts/benchmark_quant.py      # weight-quantized generate (bitsandbytes int8/nf4/fp4)
+scripts/run_matrix.py           # run a matrix of configs, one subprocess per cell
 scripts/roofline.py             # offline roofline analysis over result summaries
 scripts/jsonl_to_summary.py     # regenerate summary from per-prompt JSONL
 results/                        # per-run summary JSON (per-prompt JSONL gitignored)
