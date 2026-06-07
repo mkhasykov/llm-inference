@@ -20,6 +20,7 @@ __pycache__/
 # benchmark outputs: per-prompt JSONL is for local debug only.
 # Only the per-run summary (results/<run>.json) is committed.
 results/*.jsonl
+results/**/*.jsonl
 
 # personal notes — not for the repo
 TODO.md

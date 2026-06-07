@@ -72,6 +72,7 @@ def parse_args():
     p.add_argument("--max-new-tokens", type=int, default=256)
     p.add_argument("--out-dir", default="results")
     p.add_argument("--only", nargs="*", help="run only these cell labels")
+    p.add_argument("--skip-cells", nargs="*", help="exclude these cell labels")
     p.add_argument("--skip-speed", action="store_true")
     p.add_argument("--skip-batch", action="store_true")
     p.add_argument("--skip-quality", action="store_true")
@@ -112,6 +113,8 @@ def main():
         missing = set(args.only) - {l for l, _ in cells}
         if missing:
             print(f"warning: unknown cell labels ignored: {sorted(missing)}", file=sys.stderr)
+    if args.skip_cells:
+        cells = [(l, c) for l, c in cells if l not in set(args.skip_cells)]
 
     print(f"matrix: {len(cells)} cells on {args.model} (limit={args.limit}, repeats={args.repeats})")
     results = [run_cell(label, cmd) for label, cmd in cells]
