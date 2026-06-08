@@ -54,10 +54,16 @@ BATCH = [
 QUALITY = ["none", "int8", "nf4", "awq", "gptq-int4"]
 
 
-def run_cell(label: str, cmd: list[str]) -> tuple[str, bool, float]:
+def run_cell(label: str, cmd: list[str], timeout: float | None = None) -> tuple[str, bool, float]:
     print(f"\n{'=' * 70}\n[cell] {label}\n  $ {' '.join(cmd)}\n{'=' * 70}", flush=True)
     t0 = time.perf_counter()
-    rc = subprocess.run(cmd, cwd=REPO).returncode
+    try:
+        rc = subprocess.run(cmd, cwd=REPO, timeout=timeout).returncode
+    except subprocess.TimeoutExpired:
+        # A hung cell (e.g. a stalled download or deadlock) is killed so the
+        # matrix continues instead of blocking the whole unattended run.
+        rc = -1
+        print(f"[cell] {label}: TIMEOUT after {timeout:.0f}s — killed", flush=True)
     dt = time.perf_counter() - t0
     ok = rc == 0
     print(f"[cell] {label}: {'OK' if ok else f'FAILED (rc={rc})'} in {dt:.0f}s", flush=True)
@@ -73,6 +79,8 @@ def parse_args():
     p.add_argument("--out-dir", default="results")
     p.add_argument("--only", nargs="*", help="run only these cell labels")
     p.add_argument("--skip-cells", nargs="*", help="exclude these cell labels")
+    p.add_argument("--cell-timeout", type=float, default=None,
+                   help="kill a cell after this many seconds (safety net for unattended runs)")
     p.add_argument("--skip-speed", action="store_true")
     p.add_argument("--skip-batch", action="store_true")
     p.add_argument("--skip-quality", action="store_true")
@@ -117,7 +125,7 @@ def main():
         cells = [(l, c) for l, c in cells if l not in set(args.skip_cells)]
 
     print(f"matrix: {len(cells)} cells on {args.model} (limit={args.limit}, repeats={args.repeats})")
-    results = [run_cell(label, cmd) for label, cmd in cells]
+    results = [run_cell(label, cmd, args.cell_timeout) for label, cmd in cells]
 
     print(f"\n{'=' * 70}\nMATRIX SUMMARY\n{'=' * 70}")
     total = 0.0

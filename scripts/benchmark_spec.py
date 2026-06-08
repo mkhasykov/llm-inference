@@ -24,7 +24,8 @@ from benchmark_quant import load_quant
 
 
 def make_run_one(model, draft, tokenizer, max_new_tokens, *,
-                 fixed_length=False, dump_text=False):
+                 fixed_length=False, dump_text=False, assistant_tokenizer=None,
+                 prompt_lookup_tokens=0):
     def run_one(prompt_text: str) -> dict:
         inputs = tokenizer(prompt_text, return_tensors="pt").to(model.device)
         prompt_tokens = int(inputs["input_ids"].shape[1])
@@ -34,10 +35,21 @@ def make_run_one(model, draft, tokenizer, max_new_tokens, *,
             "max_new_tokens": max_new_tokens,
             "do_sample": False,
             "use_cache": True,
-            "assistant_model": draft,
             "streamer": streamer,
             "pad_token_id": tokenizer.eos_token_id,
         }
+        if prompt_lookup_tokens > 0:
+            # n-gram prompt-lookup decoding: candidates copied from the context,
+            # no draft model and no vocab-size constraint.
+            gen_kwargs["prompt_lookup_num_tokens"] = prompt_lookup_tokens
+        else:
+            gen_kwargs["assistant_model"] = draft
+            # Universal assisted decoding: needed when target/draft have different
+            # config.vocab_size (e.g. Qwen2.5-7B=152064 vs 0.5B=151936; the actual
+            # tokenizers are identical, but generate() requires both to be passed).
+            if assistant_tokenizer is not None:
+                gen_kwargs["tokenizer"] = tokenizer
+                gen_kwargs["assistant_tokenizer"] = assistant_tokenizer
         if fixed_length:
             gen_kwargs["min_new_tokens"] = max_new_tokens
 
@@ -70,6 +82,11 @@ def parse_args():
         choices=["none", "int8", "nf4", "fp4", "awq", "gptq-int4", "gptq-int8"],
         help="quantize the TARGET (draft stays bf16) — for spec×quant combinations",
     )
+    p.add_argument(
+        "--prompt-lookup-tokens",
+        type=int, default=0,
+        help="if >0, use n-gram prompt-lookup decoding (no draft model, no vocab constraint)",
+    )
     return p.parse_args()
 
 
@@ -85,14 +102,28 @@ def main():
         print(f"loading target: {args.model}  quant={args.quant}")
         model, tokenizer, _repo, backend = load_quant(args.model, args.quant)
         target_fmt = args.quant
-    print(f"loading draft:  {args.draft_model}")
-    draft, _ = load_model_and_tokenizer(args.draft_model)
+    lookup = args.prompt_lookup_tokens > 0
+    if lookup:
+        draft, draft_tok, uad = None, None, False
+        print(f"prompt-lookup decoding (n-gram), lookup_tokens={args.prompt_lookup_tokens}, "
+              f"target_fmt={target_fmt}")
+    else:
+        print(f"loading draft:  {args.draft_model}")
+        draft, draft_tok = load_model_and_tokenizer(args.draft_model)
+        # Different output vocab size (embedding padding, e.g. 7B=152064 vs
+        # 0.5B=151936) -> generate() needs universal assisted decoding with both
+        # tokenizers passed, even though the tokenizers themselves are identical.
+        uad = model.config.vocab_size != draft.config.vocab_size
+        print(f"models loaded, target_fmt={target_fmt}, backend={backend}, "
+              f"vocab target={model.config.vocab_size} draft={draft.config.vocab_size} "
+              f"universal_assisted={uad}")
     gpu_name = torch.cuda.get_device_name(0)
-    print(f"models loaded, target_fmt={target_fmt}, backend={backend}, gpu={gpu_name}")
 
     run_one = make_run_one(
         model, draft, tokenizer, args.max_new_tokens,
         fixed_length=args.fixed_length, dump_text=args.dump_text,
+        assistant_tokenizer=(draft_tok if uad else None),
+        prompt_lookup_tokens=args.prompt_lookup_tokens,
     )
     print("warmup...")
     warmup(run_one, tokenizer)
@@ -104,13 +135,18 @@ def main():
         "do_sample": False,
         "use_cache": True,
         "fixed_length": args.fixed_length,
-        "method": "speculative",
-        "draft_model": args.draft_model,
+        "method": "prompt_lookup" if lookup else "speculative",
+        "draft_model": None if lookup else args.draft_model,
+        "prompt_lookup_tokens": args.prompt_lookup_tokens,
         "quant": args.quant,
         "target_format": target_fmt,
         "backend": backend,
+        "universal_assisted": uad,
     }
-    kind = "spec" if args.quant == "none" else f"spec_{args.quant}"
+    if lookup:
+        kind = "spec_lookup"
+    else:
+        kind = "spec" if args.quant == "none" else f"spec_{args.quant}"
 
     # No quality axis: greedy assisted decoding is lossless (= target greedy).
     run_dataset(
