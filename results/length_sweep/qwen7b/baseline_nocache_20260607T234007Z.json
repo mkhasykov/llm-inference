@@ -1,0 +1,53 @@
+{
+  "run_id": "baseline_nocache_20260607T234007Z",
+  "kind": "baseline_nocache",
+  "model": "Qwen/Qwen2.5-7B-Instruct",
+  "gpu": "NVIDIA GeForce RTX 3090",
+  "git_commit": "e21e55d",
+  "timestamp_utc": "2026-06-07T23:42:22.943170+00:00",
+  "n_prompts": 8,
+  "repeats": 1,
+  "gen_settings": {
+    "max_new_tokens": 256,
+    "do_sample": false,
+    "use_cache": false,
+    "fixed_length": true,
+    "dtype": "bfloat16"
+  },
+  "model_info": {
+    "n_params": 7615616512,
+    "param_bytes": 15231233536
+  },
+  "gpu_state": {
+    "start": {
+      "temperature_c": 69.0,
+      "clock_graphics_mhz": 1905.0,
+      "clock_memory_mhz": 9501.0,
+      "power_w": 348.35
+    },
+    "end": {
+      "temperature_c": 73.0,
+      "clock_graphics_mhz": 1860.0,
+      "clock_memory_mhz": 9501.0,
+      "power_w": 346.86
+    }
+  },
+  "tokens_per_sec": {
+    "mean": 15.147,
+    "std": 0.733,
+    "min": 13.93,
+    "max": 16.069,
+    "n": 8
+  },
+  "ttft_ms": {
+    "mean": 37.016,
+    "std": 6.286,
+    "min": 27.948,
+    "max": 43.929,
+    "n": 8
+  },
+  "peak_vram_gb": {
+    "max": 15.292
+  },
+  "tokens_per_sec_jitter_mean": 0.0
+}

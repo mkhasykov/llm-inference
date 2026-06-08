@@ -1,0 +1,4 @@
+config,format,batch,tok/s,ttft_ms,VRAM_GB,block,ppl,mmlu,gsm8k
+baseline_cache,none,1,50±4,27±6,6.209,-,-,-,-
+manual_kv,none,1,55±3,26±7,6.26,-,-,-,-
+spec,none,1,39±6,137±106,7.283,4.79±3.83,-,-,-

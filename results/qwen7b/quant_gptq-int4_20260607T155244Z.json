@@ -1,0 +1,55 @@
+{
+  "run_id": "quant_gptq-int4_20260607T155244Z",
+  "kind": "quant_gptq-int4",
+  "model": "Qwen/Qwen2.5-7B-Instruct",
+  "gpu": "NVIDIA GeForce RTX 3090",
+  "git_commit": "e21e55d",
+  "timestamp_utc": "2026-06-07T16:18:33.745039+00:00",
+  "n_prompts": 40,
+  "repeats": 3,
+  "gen_settings": {
+    "max_new_tokens": 256,
+    "do_sample": false,
+    "use_cache": true,
+    "fixed_length": true,
+    "quant": "gptq-int4",
+    "quant_model": "Qwen/Qwen2.5-7B-Instruct-GPTQ-Int4",
+    "backend": "gptq4/triton"
+  },
+  "model_info": {
+    "n_params": 1090199040,
+    "param_bytes": 5575290624
+  },
+  "gpu_state": {
+    "start": {
+      "temperature_c": 64.0,
+      "clock_graphics_mhz": 1755.0,
+      "clock_memory_mhz": 9501.0,
+      "power_w": 345.63
+    },
+    "end": {
+      "temperature_c": 67.0,
+      "clock_graphics_mhz": 1740.0,
+      "clock_memory_mhz": 9501.0,
+      "power_w": 348.92
+    }
+  },
+  "tokens_per_sec": {
+    "mean": 19.869,
+    "std": 0.486,
+    "min": 19.021,
+    "max": 20.666,
+    "n": 40
+  },
+  "ttft_ms": {
+    "mean": 61.095,
+    "std": 9.646,
+    "min": 50.339,
+    "max": 99.766,
+    "n": 40
+  },
+  "peak_vram_gb": {
+    "max": 5.757
+  },
+  "tokens_per_sec_jitter_mean": 0.406
+}

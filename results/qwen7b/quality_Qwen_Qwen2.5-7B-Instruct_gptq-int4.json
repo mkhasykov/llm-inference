@@ -1,0 +1,27 @@
+{
+  "kind": "quality",
+  "model": "Qwen/Qwen2.5-7B-Instruct",
+  "quant": "gptq-int4",
+  "format": "gptq-int4",
+  "backend": "gptq4/triton",
+  "gpu": "NVIDIA GeForce RTX 3090",
+  "model_info": {
+    "n_params": 1090199040,
+    "param_bytes": 5575290624
+  },
+  "perplexity": {
+    "perplexity": 7.1268,
+    "corpus": "wikitext-2-raw-v1:test",
+    "n_tokens": 50000,
+    "window": 1024,
+    "stride": 512
+  },
+  "mmlu": {
+    "acc": 0.7263,
+    "limit_per_subtask": 10
+  },
+  "gsm8k": {
+    "exact_match": 0.675,
+    "limit": 200
+  }
+}

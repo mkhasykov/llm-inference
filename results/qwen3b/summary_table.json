@@ -1,0 +1,38 @@
+[
+  {
+    "config": "baseline_cache",
+    "format": "none",
+    "batch": 1,
+    "tok/s": "50\u00b14",
+    "ttft_ms": "27\u00b16",
+    "VRAM_GB": 6.209,
+    "block": "-",
+    "ppl": "-",
+    "mmlu": "-",
+    "gsm8k": "-"
+  },
+  {
+    "config": "manual_kv",
+    "format": "none",
+    "batch": 1,
+    "tok/s": "55\u00b13",
+    "ttft_ms": "26\u00b17",
+    "VRAM_GB": 6.26,
+    "block": "-",
+    "ppl": "-",
+    "mmlu": "-",
+    "gsm8k": "-"
+  },
+  {
+    "config": "spec",
+    "format": "none",
+    "batch": 1,
+    "tok/s": "39\u00b16",
+    "ttft_ms": "137\u00b1106",
+    "VRAM_GB": 7.283,
+    "block": "4.79\u00b13.83",
+    "ppl": "-",
+    "mmlu": "-",
+    "gsm8k": "-"
+  }
+]
