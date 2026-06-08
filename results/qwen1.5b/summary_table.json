@@ -144,6 +144,42 @@
     "gsm8k": "-"
   },
   {
+    "config": "batch_awq_b2",
+    "format": "awq",
+    "batch": 2,
+    "tok/s": "84\u00b16",
+    "ttft_ms": "43\u00b111",
+    "VRAM_GB": 1.226,
+    "block": "-",
+    "ppl": "-",
+    "mmlu": "-",
+    "gsm8k": "-"
+  },
+  {
+    "config": "batch_bfloat16_b2",
+    "format": "none",
+    "batch": 2,
+    "tok/s": "115\u00b14",
+    "ttft_ms": "30\u00b18",
+    "VRAM_GB": 3.141,
+    "block": "-",
+    "ppl": "-",
+    "mmlu": "-",
+    "gsm8k": "-"
+  },
+  {
+    "config": "batch_nf4_b2",
+    "format": "nf4",
+    "batch": 2,
+    "tok/s": "76\u00b13",
+    "ttft_ms": "36\u00b110",
+    "VRAM_GB": 1.227,
+    "block": "-",
+    "ppl": "-",
+    "mmlu": "-",
+    "gsm8k": "-"
+  },
+  {
     "config": "batch_awq_b4",
     "format": "awq",
     "batch": 4,
@@ -180,6 +216,42 @@
     "gsm8k": "-"
   },
   {
+    "config": "batch_awq_b8",
+    "format": "awq",
+    "batch": 8,
+    "tok/s": "350\u00b116",
+    "ttft_ms": "74\u00b122",
+    "VRAM_GB": 1.338,
+    "block": "-",
+    "ppl": "-",
+    "mmlu": "-",
+    "gsm8k": "-"
+  },
+  {
+    "config": "batch_bfloat16_b8",
+    "format": "none",
+    "batch": 8,
+    "tok/s": "450\u00b115",
+    "ttft_ms": "66\u00b123",
+    "VRAM_GB": 3.273,
+    "block": "-",
+    "ppl": "-",
+    "mmlu": "-",
+    "gsm8k": "-"
+  },
+  {
+    "config": "batch_nf4_b8",
+    "format": "nf4",
+    "batch": 8,
+    "tok/s": "269\u00b18",
+    "ttft_ms": "74\u00b123",
+    "VRAM_GB": 1.34,
+    "block": "-",
+    "ppl": "-",
+    "mmlu": "-",
+    "gsm8k": "-"
+  },
+  {
     "config": "batch_awq_b16",
     "format": "awq",
     "batch": 16,
@@ -210,6 +282,42 @@
     "tok/s": "460\u00b131",
     "ttft_ms": "161\u00b162",
     "VRAM_GB": 1.514,
+    "block": "-",
+    "ppl": "-",
+    "mmlu": "-",
+    "gsm8k": "-"
+  },
+  {
+    "config": "batch_awq_b32",
+    "format": "awq",
+    "batch": 32,
+    "tok/s": "1069\u00b10",
+    "ttft_ms": "370\u00b10",
+    "VRAM_GB": 1.865,
+    "block": "-",
+    "ppl": "-",
+    "mmlu": "-",
+    "gsm8k": "-"
+  },
+  {
+    "config": "batch_bfloat16_b32",
+    "format": "none",
+    "batch": 32,
+    "tok/s": "1352\u00b10",
+    "ttft_ms": "367\u00b10",
+    "VRAM_GB": 3.801,
+    "block": "-",
+    "ppl": "-",
+    "mmlu": "-",
+    "gsm8k": "-"
+  },
+  {
+    "config": "batch_nf4_b32",
+    "format": "nf4",
+    "batch": 32,
+    "tok/s": "913\u00b10",
+    "ttft_ms": "373\u00b10",
+    "VRAM_GB": 1.866,
     "block": "-",
     "ppl": "-",
     "mmlu": "-",

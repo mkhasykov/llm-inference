@@ -156,6 +156,42 @@
     "gsm8k": 0.755
   },
   {
+    "config": "batch_awq_b2",
+    "format": "awq",
+    "batch": 2,
+    "tok/s": "69\u00b14",
+    "ttft_ms": "91\u00b122",
+    "VRAM_GB": 5.79,
+    "block": "-",
+    "ppl": 7.2183,
+    "mmlu": 0.7263,
+    "gsm8k": 0.73
+  },
+  {
+    "config": "batch_bfloat16_b2",
+    "format": "none",
+    "batch": 2,
+    "tok/s": "73\u00b12",
+    "ttft_ms": "64\u00b122",
+    "VRAM_GB": 15.334,
+    "block": "-",
+    "ppl": 6.8286,
+    "mmlu": 0.7404,
+    "gsm8k": 0.76
+  },
+  {
+    "config": "batch_nf4_b2",
+    "format": "nf4",
+    "batch": 2,
+    "tok/s": "35\u00b11",
+    "ttft_ms": "92\u00b122",
+    "VRAM_GB": 5.783,
+    "block": "-",
+    "ppl": 7.136,
+    "mmlu": 0.7211,
+    "gsm8k": 0.755
+  },
+  {
     "config": "batch_awq_b4",
     "format": "awq",
     "batch": 4,
@@ -192,6 +228,42 @@
     "gsm8k": 0.755
   },
   {
+    "config": "batch_awq_b8",
+    "format": "awq",
+    "batch": 8,
+    "tok/s": "238\u00b116",
+    "ttft_ms": "263\u00b188",
+    "VRAM_GB": 6.014,
+    "block": "-",
+    "ppl": 7.2183,
+    "mmlu": 0.7263,
+    "gsm8k": 0.73
+  },
+  {
+    "config": "batch_bfloat16_b8",
+    "format": "none",
+    "batch": 8,
+    "tok/s": "266\u00b17",
+    "ttft_ms": "242\u00b198",
+    "VRAM_GB": 15.61,
+    "block": "-",
+    "ppl": 6.8286,
+    "mmlu": 0.7404,
+    "gsm8k": 0.76
+  },
+  {
+    "config": "batch_nf4_b8",
+    "format": "nf4",
+    "batch": 8,
+    "tok/s": "144\u00b13",
+    "ttft_ms": "267\u00b197",
+    "VRAM_GB": 6.006,
+    "block": "-",
+    "ppl": 7.136,
+    "mmlu": 0.7211,
+    "gsm8k": 0.755
+  },
+  {
     "config": "batch_awq_b16",
     "format": "awq",
     "batch": 16,
@@ -222,6 +294,42 @@
     "tok/s": "244\u00b13",
     "ttft_ms": "620\u00b1229",
     "VRAM_GB": 6.305,
+    "block": "-",
+    "ppl": 7.136,
+    "mmlu": 0.7211,
+    "gsm8k": 0.755
+  },
+  {
+    "config": "batch_awq_b32",
+    "format": "awq",
+    "batch": 32,
+    "tok/s": "650\u00b10",
+    "ttft_ms": "1545\u00b10",
+    "VRAM_GB": 7.049,
+    "block": "-",
+    "ppl": 7.2183,
+    "mmlu": 0.7263,
+    "gsm8k": 0.73
+  },
+  {
+    "config": "batch_bfloat16_b32",
+    "format": "none",
+    "batch": 32,
+    "tok/s": "688\u00b10",
+    "ttft_ms": "1484\u00b10",
+    "VRAM_GB": 16.711,
+    "block": "-",
+    "ppl": 6.8286,
+    "mmlu": 0.7404,
+    "gsm8k": 0.76
+  },
+  {
+    "config": "batch_nf4_b32",
+    "format": "nf4",
+    "batch": 32,
+    "tok/s": "442\u00b10",
+    "ttft_ms": "1509\u00b10",
+    "VRAM_GB": 7.039,
     "block": "-",
     "ppl": 7.136,
     "mmlu": 0.7211,
