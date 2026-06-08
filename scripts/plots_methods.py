@@ -22,6 +22,9 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt  # noqa: E402
 
 from aggregate import load_results  # noqa: E402
+from plotstyle import label, family_color, annotate_v, annotate_h, GREEN, GRAY  # noqa: E402
+
+RED = "#d62728"
 
 
 def dedupe_latest(speed):
@@ -44,8 +47,7 @@ def single_stream(speed):
         if not tps:
             continue
         out.append({
-            "kind": s["kind"],
-            "tps": tps,
+            "kind": s["kind"], "tps": tps,
             "vram": (s.get("peak_vram_gb") or {}).get("max"),
             "block": (s.get("mean_block_size") or {}).get("mean"),
         })
@@ -58,21 +60,25 @@ def fig_vs_baseline(rows, out, baseline="baseline_cache"):
     if not base or not base["tps"]:
         return None
     items = sorted([r for r in rows if r["kind"] != baseline], key=lambda r: r["tps"] / base["tps"])
-    names = [r["kind"] for r in items]
+    names = [label(r["kind"]) for r in items]
     spd = [r["tps"] / base["tps"] for r in items]
     vr = [(r["vram"] / base["vram"]) if r["vram"] and base["vram"] else 0 for r in items]
 
-    fig, axes = plt.subplots(1, 2, figsize=(13, max(3, 0.5 * len(items))))
-    axes[0].barh(names, spd, color=["seagreen" if x >= 1 else "indianred" for x in spd])
+    fig, axes = plt.subplots(1, 2, figsize=(13, max(3.5, 0.55 * len(items))))
+    b0 = axes[0].barh(names, spd, color=[GREEN if x >= 1 else RED for x in spd])
     axes[0].axvline(1, color="k", lw=1, ls="--")
-    axes[0].set_xlabel(f"speed vs {baseline} (×)")
-    axes[0].set_title("Speed relative to baseline (>1 = faster)")
-    axes[1].barh(names, vr, color=["seagreen" if 0 < x <= 1 else "indianred" for x in vr])
+    annotate_h(axes[0], b0, "{:.2f}×")
+    axes[0].set_xlim(0, max(spd) * 1.15)
+    axes[0].set_xlabel(f"speed vs {label(baseline)} (×)")
+    axes[0].set_title("Speed relative to baseline  (>1 = faster)")
+    b1 = axes[1].barh(names, vr, color=[GREEN if 0 < x <= 1 else RED for x in vr])
     axes[1].axvline(1, color="k", lw=1, ls="--")
-    axes[1].set_xlabel(f"VRAM vs {baseline} (×)")
-    axes[1].set_title("Memory relative to baseline (<1 = less)")
-    fig.suptitle(f"Each method vs baseline ({baseline}, batch=1)")
-    fig.tight_layout(); fig.savefig(out, dpi=120); plt.close(fig)
+    annotate_h(axes[1], b1, "{:.2f}×")
+    axes[1].set_xlim(0, max(vr) * 1.15)
+    axes[1].set_xlabel(f"VRAM vs {label(baseline)} (×)")
+    axes[1].set_title("Memory relative to baseline  (<1 = less)")
+    fig.suptitle(f"Each method vs baseline ({label(baseline)}, batch=1)")
+    fig.tight_layout(); fig.savefig(out); plt.close(fig)
     return out
 
 
@@ -82,21 +88,23 @@ def fig_spec(rows, out):
     items = [by[k] for k in order if k in by]
     if len(items) < 2:
         return None
-    fig, ax = plt.subplots(figsize=(8, 4.5))
-    bars = ax.bar([i["kind"] for i in items], [i["tps"] for i in items],
-                  color=["gray"] + ["steelblue"] * (len(items) - 1))
+    fig, ax = plt.subplots(figsize=(8.5, 5))
+    colors = [GRAY if it["kind"] == "baseline_cache" else family_color(it["kind"]) for it in items]
+    bars = ax.bar([label(it["kind"]) for it in items], [it["tps"] for it in items], color=colors)
+    annotate_v(ax, bars, "{:.0f}")
     base = by.get("baseline_cache")
     if base:
-        ax.axhline(base["tps"], color="k", ls="--", lw=1, label="baseline")
+        ax.axhline(base["tps"], color="k", ls="--", lw=1, label=f"baseline ({base['tps']:.0f})")
         ax.legend()
     for b, it in zip(bars, items):
         if it["block"]:
-            ax.annotate(f"blk {it['block']:.1f}", (b.get_x() + b.get_width() / 2, b.get_height()),
-                        ha="center", va="bottom", fontsize=8)
+            ax.annotate(f"blk {it['block']:.1f}", (b.get_x() + b.get_width() / 2, b.get_height() / 2),
+                        ha="center", va="center", fontsize=8, color="white")
     ax.set_ylabel("decode tok/s (batch=1)")
+    ax.set_ylim(0, max(it["tps"] for it in items) * 1.18)
     ax.set_title("Speculative-decoding variants vs baseline")
-    ax.tick_params(axis="x", rotation=30)
-    fig.tight_layout(); fig.savefig(out, dpi=120); plt.close(fig)
+    ax.tick_params(axis="x", rotation=20)
+    fig.tight_layout(); fig.savefig(out); plt.close(fig)
     return out
 
 
@@ -115,18 +123,21 @@ def fig_length(length_dir, out):
     lens = sorted({L for k in data for L in data[k]})
     fig, axes = plt.subplots(1, 2, figsize=(11, 4.5))
     for kind in sorted(data):
-        axes[0].plot(lens, [data[kind].get(L) for L in lens], "o-", label=kind)
+        axes[0].plot(lens, [data[kind].get(L) for L in lens], "o-", label=label(kind))
     axes[0].set_xlabel("generated tokens"); axes[0].set_ylabel("decode tok/s")
-    axes[0].set_title("Throughput vs generation length"); axes[0].legend(); axes[0].grid(alpha=.3)
+    axes[0].set_title("Throughput vs generation length"); axes[0].legend()
     if "baseline_cache" in data and "baseline_nocache" in data:
         ratio = [data["baseline_cache"].get(L, 0) / data["baseline_nocache"].get(L, 1) for L in lens]
         axes[1].plot(lens, ratio, "o-", color="purple")
+        for L, r in zip(lens, ratio):
+            axes[1].annotate(f"{r:.1f}×", (L, r), textcoords="offset points", xytext=(0, 6),
+                             ha="center", fontsize=8)
         axes[1].set_xlabel("generated tokens"); axes[1].set_ylabel("cache speedup (×)")
-        axes[1].set_title("KV-cache advantage grows with length"); axes[1].grid(alpha=.3)
+        axes[1].set_title("KV-cache advantage grows with length")
     else:
         axes[1].set_visible(False)
     fig.suptitle("KV-cache: behavior vs generation length")
-    fig.tight_layout(); fig.savefig(out, dpi=120); plt.close(fig)
+    fig.tight_layout(); fig.savefig(out); plt.close(fig)
     return out
 
 
@@ -141,14 +152,10 @@ def main():
 
     speed, _ = load_results(args.results_dir)
     rows = single_stream(dedupe_latest(speed))
-    for name, made in [
-        ("vs_baseline.png", fig_vs_baseline(rows, out_dir / "vs_baseline.png")),
-        ("spec_variants.png", fig_spec(rows, out_dir / "spec_variants.png")),
-    ]:
-        print(f"  {'wrote' if made else 'skip (insufficient data):'} {out_dir / name}")
+    print(f"  {'wrote' if fig_vs_baseline(rows, out_dir / 'vs_baseline.png') else 'skip:'} {out_dir / 'vs_baseline.png'}")
+    print(f"  {'wrote' if fig_spec(rows, out_dir / 'spec_variants.png') else 'skip:'} {out_dir / 'spec_variants.png'}")
     if args.length_dir:
-        made = fig_length(args.length_dir, out_dir / "length.png")
-        print(f"  {'wrote' if made else 'skip:'} {out_dir / 'length.png'}")
+        print(f"  {'wrote' if fig_length(args.length_dir, out_dir / 'length.png') else 'skip:'} {out_dir / 'length.png'}")
 
 
 if __name__ == "__main__":

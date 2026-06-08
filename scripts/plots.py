@@ -21,11 +21,8 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt  # noqa: E402
 
 from aggregate import load_results, speed_format  # noqa: E402
+from plotstyle import FORMAT_LABEL, label, family_color, annotate_v, annotate_h  # noqa: E402
 
-FORMAT_LABEL = {
-    "none": "bf16", "int8": "bnb-int8", "nf4": "bnb-nf4", "fp4": "bnb-fp4",
-    "awq": "AWQ", "gptq-int4": "GPTQ-int4", "gptq-int8": "GPTQ-int8",
-}
 FORMAT_ORDER = ["none", "int8", "fp4", "nf4", "awq", "gptq-int4", "gptq-int8"]
 
 
@@ -62,9 +59,12 @@ def fig_methods(rows, out):
     if len(r) < 2:
         return None
     r.sort(key=lambda x: x["tps"])
-    fig, ax = plt.subplots(figsize=(8, max(3, 0.5 * len(r))))
-    ax.barh([x["config"] for x in r], [x["tps"] for x in r],
-            xerr=[x["tps_std"] for x in r], color="steelblue")
+    fig, ax = plt.subplots(figsize=(8.5, max(3, 0.5 * len(r))))
+    bars = ax.barh([label(x["config"]) for x in r], [x["tps"] for x in r],
+                   xerr=[x["tps_std"] for x in r],
+                   color=[family_color(x["config"]) for x in r])
+    annotate_h(ax, bars, "{:.0f}")
+    ax.set_xlim(0, max(x["tps"] for x in r) * 1.15)
     ax.set_xlabel("decode tokens/sec (batch=1)")
     ax.set_title("Single-stream speed by method")
     fig.tight_layout(); fig.savefig(out, dpi=120); plt.close(fig)
@@ -88,13 +88,21 @@ def fig_quant(rows, out):
         return None
     labels = [FORMAT_LABEL.get(x["format"], x["format"]) for x in r]
     fig, axes = plt.subplots(1, 3, figsize=(13, 4))
-    axes[0].bar(labels, [x["tps"] or 0 for x in r], color="steelblue")
+    b0 = axes[0].bar(labels, [x["tps"] or 0 for x in r], color="steelblue")
+    annotate_v(axes[0], b0, "{:.0f}")
     axes[0].set_ylabel("decode tok/s"); axes[0].set_title("Speed")
-    axes[1].bar(labels, [x["vram"] or 0 for x in r], color="seagreen")
+    b1 = axes[1].bar(labels, [x["vram"] or 0 for x in r], color="seagreen")
+    annotate_v(axes[1], b1, "{:.1f}")
     axes[1].set_ylabel("peak VRAM (GB)"); axes[1].set_title("Memory")
     ppl = [x["ppl"] for x in r]
     if any(p is not None for p in ppl):
-        axes[2].bar(labels, [p or 0 for p in ppl], color="indianred")
+        b2 = axes[2].bar(labels, [p or 0 for p in ppl],
+                         color=["indianred" if p is not None else "lightgray" for p in ppl])
+        for bar, p in zip(b2, ppl):
+            axes[2].annotate("n/a" if p is None else f"{p:.2f}",
+                             (bar.get_x() + bar.get_width() / 2, bar.get_height()),
+                             textcoords="offset points", xytext=(0, 2),
+                             ha="center", va="bottom", fontsize=8)
         axes[2].set_ylabel("WikiText-2 perplexity"); axes[2].set_title("Quality (lower=better)")
     else:
         axes[2].set_visible(False)
