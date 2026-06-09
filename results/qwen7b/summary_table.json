@@ -60,6 +60,18 @@
     "gsm8k": 0.73
   },
   {
+    "config": "quant_awq_marlin",
+    "format": "awq",
+    "batch": 1,
+    "tok/s": "60\u00b14",
+    "ttft_ms": "32\u00b19",
+    "VRAM_GB": 5.626,
+    "block": "-",
+    "ppl": 7.2183,
+    "mmlu": 0.7263,
+    "gsm8k": 0.73
+  },
+  {
     "config": "quant_fp4",
     "format": "fp4",
     "batch": 1,
@@ -78,6 +90,18 @@
     "tok/s": "20\u00b10",
     "ttft_ms": "61\u00b110",
     "VRAM_GB": 5.757,
+    "block": "-",
+    "ppl": 7.1268,
+    "mmlu": 0.7263,
+    "gsm8k": 0.675
+  },
+  {
+    "config": "quant_gptq-int4_marlin",
+    "format": "gptq-int4",
+    "batch": 1,
+    "tok/s": "61\u00b15",
+    "ttft_ms": "35\u00b19",
+    "VRAM_GB": 5.601,
     "block": "-",
     "ppl": 7.1268,
     "mmlu": 0.7263,

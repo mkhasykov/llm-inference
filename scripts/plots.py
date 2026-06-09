@@ -75,8 +75,8 @@ def _quant_rows(rows):
     """One row per weight format at batch=1 (bf16 baseline + quant_*)."""
     seen = {}
     for x in rows:
-        if x["batch"] != 1:
-            continue
+        if x["batch"] != 1 or x["config"].endswith("_marlin"):
+            continue  # Marlin variants compared separately (methods/vs_baseline)
         if x["config"] == "baseline_cache" or x["config"].startswith("quant_"):
             seen.setdefault(x["format"], x)
     return [seen[f] for f in FORMAT_ORDER if f in seen]

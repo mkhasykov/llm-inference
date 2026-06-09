@@ -22,6 +22,10 @@ __pycache__/
 results/*.jsonl
 results/**/*.jsonl
 
+# run logs and stray package files
+results/*.log
+*.deb
+
 # personal notes — not for the repo
 TODO.md
 PLAN.md
