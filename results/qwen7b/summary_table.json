@@ -79,9 +79,9 @@
     "ttft_ms": "63\u00b18",
     "VRAM_GB": 5.744,
     "block": "-",
-    "ppl": "-",
-    "mmlu": "-",
-    "gsm8k": "-"
+    "ppl": 7.3777,
+    "mmlu": 0.7228,
+    "gsm8k": 0.71
   },
   {
     "config": "quant_gptq-int4",

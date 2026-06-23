@@ -23,7 +23,19 @@ import matplotlib.pyplot as plt  # noqa: E402
 from aggregate import load_results, speed_format  # noqa: E402
 from plotstyle import FORMAT_LABEL, label, family_color, annotate_v, annotate_h  # noqa: E402
 
-FORMAT_ORDER = ["none", "int8", "fp4", "nf4", "awq", "gptq-int4", "gptq-int8"]
+# bf16 baseline + each quant format for the format-comparison figures.
+# 4-bit AWQ/GPTQ appear twice — Triton and Marlin kernels — so the figure shows
+# the kernel-dependence of the 4-bit speed-up directly, not just memory savings.
+QUANT_CONFIGS = [
+    ("baseline_cache", "bf16"),
+    ("quant_int8", "bnb-int8"),
+    ("quant_fp4", "bnb-fp4"),
+    ("quant_nf4", "bnb-nf4"),
+    ("quant_awq", "AWQ (Triton)"),
+    ("quant_awq_marlin", "AWQ (Marlin)"),
+    ("quant_gptq-int4", "GPTQ4 (Triton)"),
+    ("quant_gptq-int4_marlin", "GPTQ4 (Marlin)"),
+]
 
 
 def dedupe_latest(speed):
@@ -72,21 +84,26 @@ def fig_methods(rows, out):
 
 
 def _quant_rows(rows):
-    """One row per weight format at batch=1 (bf16 baseline + quant_*)."""
-    seen = {}
-    for x in rows:
-        if x["batch"] != 1 or x["config"].endswith("_marlin"):
-            continue  # Marlin variants compared separately (methods/vs_baseline)
-        if x["config"] == "baseline_cache" or x["config"].startswith("quant_"):
-            seen.setdefault(x["format"], x)
-    return [seen[f] for f in FORMAT_ORDER if f in seen]
+    """bf16 baseline + one row per quant config at batch=1, in QUANT_CONFIGS order.
+
+    Includes both the Triton and the Marlin 4-bit variants so the quant/pareto
+    figures show that the 4-bit speed-up is kernel-dependent (same weights, same
+    memory and quality, very different speed).
+    """
+    by = {x["config"]: x for x in rows if x["batch"] == 1}
+    out = []
+    for cfg, lbl in QUANT_CONFIGS:
+        if cfg in by:
+            r = dict(by[cfg]); r["qlabel"] = lbl
+            out.append(r)
+    return out
 
 
 def fig_quant(rows, out):
     r = _quant_rows(rows)
     if len(r) < 2:
         return None
-    labels = [FORMAT_LABEL.get(x["format"], x["format"]) for x in r]
+    labels = [x["qlabel"] for x in r]
     fig, axes = plt.subplots(1, 3, figsize=(13, 4))
     b0 = axes[0].bar(labels, [x["tps"] or 0 for x in r], color="steelblue")
     annotate_v(axes[0], b0, "{:.0f}")
@@ -145,7 +162,7 @@ def fig_pareto(rows, out):
     if len(have_ppl) >= 2:
         for x in have_ppl:
             axes[0].scatter(x["ppl"], x["tps"])
-            axes[0].annotate(FORMAT_LABEL.get(x["format"], x["format"]), (x["ppl"], x["tps"]),
+            axes[0].annotate(x["qlabel"], (x["ppl"], x["tps"]),
                              textcoords="offset points", xytext=(5, 4), fontsize=8)
         axes[0].set_xlabel("perplexity (lower=better)"); axes[0].set_ylabel("decode tok/s")
         axes[0].set_title("Speed vs quality")
@@ -153,7 +170,7 @@ def fig_pareto(rows, out):
         axes[0].set_visible(False)
     for x in have_vram:
         axes[1].scatter(x["vram"], x["tps"])
-        axes[1].annotate(FORMAT_LABEL.get(x["format"], x["format"]), (x["vram"], x["tps"]),
+        axes[1].annotate(x["qlabel"], (x["vram"], x["tps"]),
                          textcoords="offset points", xytext=(5, 4), fontsize=8)
     axes[1].set_xlabel("peak VRAM (GB)"); axes[1].set_ylabel("decode tok/s")
     axes[1].set_title("Speed vs memory")

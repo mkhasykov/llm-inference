@@ -29,3 +29,6 @@ results/*.log
 # personal notes — not for the repo
 TODO.md
 PLAN.md
+
+# master's thesis — local only, not for the public repo
+thesis/

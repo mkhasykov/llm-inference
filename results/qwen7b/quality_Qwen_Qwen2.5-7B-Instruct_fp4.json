@@ -1,0 +1,27 @@
+{
+  "kind": "quality",
+  "model": "Qwen/Qwen2.5-7B-Instruct",
+  "quant": "fp4",
+  "format": "fp4",
+  "backend": "bitsandbytes/fp4",
+  "gpu": "NVIDIA GeForce RTX 3090",
+  "model_info": {
+    "n_params": 4352972288,
+    "param_bytes": 5443300864
+  },
+  "perplexity": {
+    "perplexity": 7.3777,
+    "corpus": "wikitext-2-raw-v1:test",
+    "n_tokens": 50000,
+    "window": 1024,
+    "stride": 512
+  },
+  "mmlu": {
+    "acc": 0.7228,
+    "limit_per_subtask": 10
+  },
+  "gsm8k": {
+    "exact_match": 0.71,
+    "limit": 200
+  }
+}
