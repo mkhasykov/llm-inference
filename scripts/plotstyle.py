@@ -25,8 +25,8 @@ LABEL = {
     "quant_fp4": "bnb-fp4",
     "quant_awq": "AWQ-int4 (Triton)",
     "quant_gptq-int4": "GPTQ-int4 (Triton)",
-    "quant_awq_marlin": "AWQ-int4 (Marlin)",
-    "quant_gptq-int4_marlin": "GPTQ-int4 (Marlin)",
+    "quant_awq_marlin": "AWQ-int4",
+    "quant_gptq-int4_marlin": "GPTQ-int4",
     "spec": "spec (draft 0.5B)",
     "spec_nf4": "spec + nf4 target",
     "spec_awq": "spec + AWQ target",
@@ -39,6 +39,15 @@ FORMAT_LABEL = {
     "int8": "bnb-int8", "nf4": "bnb-nf4", "fp4": "bnb-fp4",
     "awq": "AWQ-int4", "gptq-int4": "GPTQ-int4", "gptq-int8": "GPTQ-int8",
 }
+
+# 4-bit configs on the generic Triton kernels — dropped from the figures in
+# favor of their Marlin variants (Marlin is the 4-bit result we present).
+TRITON_CONFIGS = {"quant_awq", "quant_gptq-int4"}
+
+# Configs hidden from the method-comparison figures (vs_baseline, methods):
+# the Triton 4-bit variants + the manual KV-cache loop (an implementation
+# detail dropped from the presentation narrative).
+HIDE_CONFIGS = TRITON_CONFIGS | {"manual_kv"}
 
 # method-family colors (consistent across figures)
 GRAY, GREEN, ORANGE, BLUE = "#7f7f7f", "#2ca02c", "#ff7f0e", "#1f77b4"

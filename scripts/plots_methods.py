@@ -22,7 +22,7 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt  # noqa: E402
 
 from aggregate import load_results  # noqa: E402
-from plotstyle import label, family_color, annotate_v, annotate_h, GREEN, GRAY  # noqa: E402
+from plotstyle import label, family_color, annotate_v, annotate_h, GREEN, GRAY, HIDE_CONFIGS  # noqa: E402
 
 RED = "#d62728"
 
@@ -43,6 +43,8 @@ def single_stream(speed):
         gs = s.get("gen_settings", {})
         if gs.get("batch_size", 1) != 1 or s["kind"].startswith("batch_"):
             continue
+        if s["kind"] in HIDE_CONFIGS:
+            continue  # Marlin 4-bit only (not Triton); manual KV-cache dropped from deck
         tps = (s.get("tokens_per_sec") or {}).get("mean")
         if not tps:
             continue

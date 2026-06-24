@@ -21,20 +21,18 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt  # noqa: E402
 
 from aggregate import load_results, speed_format  # noqa: E402
-from plotstyle import FORMAT_LABEL, label, family_color, annotate_v, annotate_h  # noqa: E402
+from plotstyle import FORMAT_LABEL, label, family_color, annotate_v, annotate_h, HIDE_CONFIGS  # noqa: E402
 
 # bf16 baseline + each quant format for the format-comparison figures.
-# 4-bit AWQ/GPTQ appear twice — Triton and Marlin kernels — so the figure shows
-# the kernel-dependence of the 4-bit speed-up directly, not just memory savings.
+# 4-bit AWQ/GPTQ use the optimized Marlin kernels; the slower Triton variants
+# are left out of the figures (Marlin is the 4-bit result we present).
 QUANT_CONFIGS = [
     ("baseline_cache", "bf16"),
     ("quant_int8", "bnb-int8"),
     ("quant_fp4", "bnb-fp4"),
     ("quant_nf4", "bnb-nf4"),
-    ("quant_awq", "AWQ (Triton)"),
-    ("quant_awq_marlin", "AWQ (Marlin)"),
-    ("quant_gptq-int4", "GPTQ4 (Triton)"),
-    ("quant_gptq-int4_marlin", "GPTQ4 (Marlin)"),
+    ("quant_awq_marlin", "AWQ-int4"),
+    ("quant_gptq-int4_marlin", "GPTQ-int4"),
 ]
 
 
@@ -62,12 +60,14 @@ def to_rows(speed, quality):
             "vram": vram.get("max"), "block": blk.get("mean"),
             "ppl": q["perplexity"]["perplexity"] if q else None,
             "mmlu": q["mmlu"]["acc"] if q else None,
+            "gsm8k": q["gsm8k"]["exact_match"] if q else None,
         })
     return rows
 
 
 def fig_methods(rows, out):
-    r = [x for x in rows if x["batch"] == 1 and not x["config"].startswith("batch_") and x["tps"]]
+    r = [x for x in rows if x["batch"] == 1 and not x["config"].startswith("batch_")
+         and x["config"] not in HIDE_CONFIGS and x["tps"]]
     if len(r) < 2:
         return None
     r.sort(key=lambda x: x["tps"])
@@ -104,28 +104,56 @@ def fig_quant(rows, out):
     if len(r) < 2:
         return None
     labels = [x["qlabel"] for x in r]
-    fig, axes = plt.subplots(1, 3, figsize=(13, 4))
+    # speed + memory only; quality (ppl / MMLU / GSM8K) lives in fig_quality
+    fig, axes = plt.subplots(1, 2, figsize=(9.5, 4))
     b0 = axes[0].bar(labels, [x["tps"] or 0 for x in r], color="steelblue")
     annotate_v(axes[0], b0, "{:.0f}")
-    axes[0].set_ylabel("decode tok/s"); axes[0].set_title("Speed")
+    axes[0].set_ylabel("decode tok/s"); axes[0].set_title("Speed (higher = better)")
     b1 = axes[1].bar(labels, [x["vram"] or 0 for x in r], color="seagreen")
     annotate_v(axes[1], b1, "{:.1f}")
-    axes[1].set_ylabel("peak VRAM (GB)"); axes[1].set_title("Memory")
-    ppl = [x["ppl"] for x in r]
-    if any(p is not None for p in ppl):
-        b2 = axes[2].bar(labels, [p or 0 for p in ppl],
-                         color=["indianred" if p is not None else "lightgray" for p in ppl])
-        for bar, p in zip(b2, ppl):
-            axes[2].annotate("n/a" if p is None else f"{p:.2f}",
-                             (bar.get_x() + bar.get_width() / 2, bar.get_height()),
-                             textcoords="offset points", xytext=(0, 2),
-                             ha="center", va="bottom", fontsize=8)
-        axes[2].set_ylabel("WikiText-2 perplexity"); axes[2].set_title("Quality (lower=better)")
-    else:
-        axes[2].set_visible(False)
+    axes[1].set_ylabel("peak VRAM (GB)"); axes[1].set_title("Memory (lower = better)")
     for ax in axes:
         ax.tick_params(axis="x", rotation=45)
-    fig.suptitle("Quantization: speed / memory / quality by format")
+    fig.suptitle("Quantization: speed and memory by format")
+    fig.tight_layout(); fig.savefig(out, dpi=120); plt.close(fig)
+    return out
+
+
+def fig_quality(rows, out):
+    """Quality across formats on three axes: WikiText-2 perplexity (lower=better)
+    plus MMLU and GSM8K accuracy (higher=better). Perplexity alone hides the real
+    impact — e.g. GPTQ-int4 drops GSM8K while its perplexity barely moves."""
+    r = _quant_rows(rows)
+    r = [x for x in r if any(x[k] is not None for k in ("ppl", "mmlu", "gsm8k"))]
+    if len(r) < 2:
+        return None
+    labels = [x["qlabel"] for x in r]
+    fig, axes = plt.subplots(1, 3, figsize=(13, 4))
+
+    ppl = [x["ppl"] for x in r]
+    b0 = axes[0].bar(labels, [p or 0 for p in ppl], color="indianred")
+    annotate_v(axes[0], b0, "{:.2f}")
+    axes[0].set_ylabel("WikiText-2 perplexity")
+    axes[0].set_title("Perplexity (lower = better)")
+    if any(ppl):
+        axes[0].set_ylim(0, max(p for p in ppl if p) * 1.2)
+
+    for ax, key, color, title in [
+        (axes[1], "mmlu", "steelblue", "MMLU accuracy (higher = better)"),
+        (axes[2], "gsm8k", "seagreen", "GSM8K accuracy (higher = better)"),
+    ]:
+        vals = [(x[key] * 100 if x[key] is not None else 0) for x in r]
+        bars = ax.bar(labels, vals, color=color)
+        annotate_v(ax, bars, "{:.1f}")
+        ax.set_ylabel("accuracy, %")
+        ax.set_title(title)
+        if vals and vals[0]:  # dashed line at the bf16 baseline (first config)
+            ax.axhline(vals[0], color="k", ls="--", lw=1)
+        ax.set_ylim(0, (max(vals) if any(vals) else 1) * 1.18)
+
+    for ax in axes:
+        ax.tick_params(axis="x", rotation=45)
+    fig.suptitle("Quantization quality: perplexity, MMLU, GSM8K by format")
     fig.tight_layout(); fig.savefig(out, dpi=120); plt.close(fig)
     return out
 
@@ -198,6 +226,7 @@ def main():
     figures = {
         "methods.png": fig_methods,
         "quant.png": fig_quant,
+        "quality.png": fig_quality,
         "batch.png": fig_batch,
         "pareto.png": fig_pareto,
     }
